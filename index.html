@@ -144,6 +144,7 @@
         <button class="act raid" id="btnSabotageToggle"><span class="lbl">Sabotage</span><span class="sub">1 AP, curse a rival</span></button>
         <button class="act" id="btnBlacksmithToggle"><span class="lbl">Blacksmith</span><span class="sub">Craft or upgrade gear</span></button>
         <button class="act" id="btnTransmute"><span class="lbl">Transmute</span><span class="sub" id="transmuteSub">give &rarr; receive 1</span></button>
+        <button class="act" id="btnScavenge"><span class="lbl">Scavenge</span><span class="sub">free, only when stuck</span></button>
       </div>
 
       <div class="ascendRow">
@@ -177,6 +178,16 @@
         </div>
       </div>
 
+      <div class="panelInline glass" id="transmutePanel">
+        <div class="row">
+          <div class="field" style="flex:1 1 100%;"><label>Discard 3 materials, receive 1 of</label><select id="transmuteTarget"></select></div>
+        </div>
+        <div class="submitRow">
+          <button class="act" id="btnDoTransmute">Transmute</button>
+          <button class="act" id="btnCancelTransmute">Cancel</button>
+        </div>
+      </div>
+
       <div class="panelInline glass" id="blacksmithPanel">
         <div class="row">
           <div class="field" style="flex:1 1 100%;"><label>Craft or upgrade</label><select id="blacksmithItem"></select></div>
@@ -196,16 +207,17 @@
     <h2>How to play</h2>
     <div class="howRow"><span class="hic">&#x1F3AF;</span><span class="htxt"><b>Objective:</b> race to Floor 6 and defeat the Sovereign, or hold the strongest position when your friends call the game.</span></div>
     <div class="howRow"><span class="hic">&#x2694;&#xFE0F;</span><span class="htxt"><b>Turn actions (2 AP):</b> Hunt, Train, Raid, and Sabotage each cost 1 action point. Trade, Craft, Transmute, and Ascend are free.</span></div>
-    <div class="howRow"><span class="hic">&#x1F3B2;</span><span class="htxt"><b>Hunt:</b> roll 2d6 vs the floor's DR. Success grants progress and usually a material. Snake eyes (1+1) lets you steal from a rival instead of losing progress. Double sixes crit for +2 progress and a free action.</span></div>
+    <div class="howRow"><span class="hic">&#x1F3B2;</span><span class="htxt"><b>Hunt:</b> roll 2d6 vs the floor's DR. Success grants +1 progress and a Loot Card, usually this floor's material, sometimes Broken Gear (single use, +2 to one hunt). A natural 2 costs you 1 banked progress unless a Shield absorbs it. Double sixes crit for +2 progress and a free action.</span></div>
     <div class="howRow"><span class="hic">&#x1F4DA;</span><span class="htxt"><b>Train:</b> spend 2 of the current floor's material for a guaranteed +1 progress, no roll.</span></div>
     <div class="howRow"><span class="hic">&#x1F5E1;&#xFE0F;</span><span class="htxt"><b>Raid:</b> roll a d6, 4 or higher steals 1 random material from a rival.</span></div>
     <div class="howRow"><span class="hic">&#x1F91D;</span><span class="htxt"><b>Trade:</b> propose a material swap with any guild. They accept or decline on their own device (AI guilds respond automatically).</span></div>
     <div class="howRow"><span class="hic">&#x1FA84;</span><span class="htxt"><b>Sabotage:</b> spend 1 material to curse a rival, their next Hunt total takes -2.</span></div>
     <div class="howRow"><span class="hic">&#x1F3F9;</span><span class="htxt"><b>Blacksmith:</b> craft Basic Bow (2 Kasaka Fang, reroll a die) or Basic Sword (2 Golem Crystal, +2 total), upgrade them, or craft accessories: Shield (blocks a snake-eyes penalty), Lucky Coin (+1 loot on success), Compass (+1 progress on success). 2 item slots, only 1 accessory at a time.</span></div>
-    <div class="howRow"><span class="hic">&#x2728;</span><span class="htxt"><b>Transmute:</b> spend the floor's listed cost in any combination of materials to receive 1 of that floor's material.
-      <div class="tcostTable" id="tcostTable"></div>
-    </span></div>
-    <div class="howRow"><span class="hic">&#x1FA9C;</span><span class="htxt"><b>Ascend:</b> once you meet the progress requirement and hold the toll material, move up to the next floor.</span></div>
+    <div class="howRow"><span class="hic">&#x2728;</span><span class="htxt"><b>Shadow Transmutation:</b> discard any 3 materials, in any mix, to receive 1 material of your choice. Free, and repeatable as long as you have the materials and a slot for the result.</span></div>
+    <div class="howRow"><span class="hic">&#x1FA9C;</span><span class="htxt"><b>Ascend:</b> once you meet the progress requirement and hold the toll material, move up to the next floor. <b>Floors 3, 5 and 6 also need a Floor Key</b>: Vanguard's Sigil (1 Kasaka Fang + 1 Golem Crystal), Kaisel Ward (1 Orc Tusk + 1 Oracle Wisp), Sovereign's Bane (1 Kaisel Scale + 1 Kasaka Fang). A Key is crafted and spent in the same instant, so it never takes a slot, and the last one reaches back to Floor 1 on purpose.</span></div>
+    <div class="howRow"><span class="hic">&#x1F9FA;</span><span class="htxt"><b>Storage:</b> 4 material slots and 2 item slots. The cap is on variety, never on how many copies of one material you stack. Only 1 accessory at a time.</span></div>
+    <div class="howRow"><span class="hic">&#x1F9F9;</span><span class="htxt"><b>Desperate Scavenge:</b> if you have no legal action left at all, take 1 material free from this floor's pool, or the nearest lower one. Once per turn.</span></div>
+    <div class="howRow"><span class="hic">&#x1F3C1;</span><span class="htxt"><b>Ending:</b> defeat the Sovereign on Floor 6 to win outright. If nobody has after 12 rounds, the highest climber wins; ties go to progress, then to the value of materials and gear on hand (a material is worth its floor number).</span></div>
     <div class="howRow"><span class="hic">&#x1F480;</span><span class="htxt"><b>Monster Outbreak:</b> the lowest floor nobody has cleared yet carries a countdown, shown above the Tower panel. It resets when that floor is finally cleared. If it hits 0, the guild furthest ahead loses 2 progress and everyone else loses 1.</span></div>
     <div class="howRow"><span class="hic">&#x1F4A5;</span><span class="htxt"><b>Camping:</b> stay on the same floor past 3 of your own turns and the Monster attacks, -1 progress and -1 material.</span></div>
     <div class="howRow"><span class="hic">&#x1F340;</span><span class="htxt"><b>Tower Events:</b> roughly 1 in 3 turns draws a random event, good or bad, when your turn begins.</span></div>

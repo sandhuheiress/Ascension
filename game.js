@@ -15,18 +15,27 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 const floors=[
-  {name:"Kasaka Fang", dr:6, need:2, toll:1, tcost:4},
-  {name:"Golem Crystal", dr:7, need:3, toll:2, tcost:4},
-  {name:"Orc Tusk", dr:8, need:4, toll:2, tcost:3},
-  {name:"Oracle Wisp", dr:9, need:5, toll:3, tcost:3},
-  {name:"Kaisel Scale", dr:10, need:6, toll:3, tcost:2},
-  {name:"Sovereign's Ash", dr:11, need:7, toll:0, tcost:2}
+  {name:"Kasaka Fang", dr:6, need:2, toll:1},
+  {name:"Golem Crystal", dr:7, need:3, toll:2},
+  {name:"Orc Tusk", dr:8, need:4, toll:2},
+  {name:"Oracle Wisp", dr:9, need:5, toll:3},
+  {name:"Kaisel Scale", dr:10, need:6, toll:3},
+  {name:"Sovereign's Ash", dr:11, need:7, toll:0}
 ];
-document.getElementById('tcostTable').innerHTML = floors.map(function(f,i){
-  return '<div><span>Floor '+(i+1)+', '+f.name+'</span><b>'+f.tcost+' given &rarr; receive 1</b></div>';
-}).join('');
 
-const CAP=3, CAMP_LIMIT=3, START_POOL=10, GEAR_SLOTS=2;
+// Rules of Play sections 9 and 14: leaving floors 3, 5 and 6 also costs a Floor Key.
+// A Key is crafted and spent in the same instant, so it never occupies a mat slot.
+// The last one reaches back to Floor 1 on purpose: the leader needs a trailing Guild's material.
+const KEYS={
+  2: {name:"Vanguard's Sigil", cost:{'Kasaka Fang':1,'Golem Crystal':1}},
+  4: {name:'Kaisel Ward',      cost:{'Orc Tusk':1,'Oracle Wisp':1}},
+  5: {name:"Sovereign's Bane", cost:{'Kaisel Scale':1,'Kasaka Fang':1}}
+};
+// section 11: 4 material slots and 2 item slots. section 8: 3 materials buy 1 of choice.
+// section 17: 12 rounds, then the highest climber wins.
+const CAP=4, CAMP_LIMIT=3, START_POOL=10, GEAR_SLOTS=2, TRANSMUTE_COST=3, ROUND_LIMIT=12;
+// most Loot Cards are the floor's raw material, a few are Broken Gear (section 5)
+const LOOT_DECK=['mat','mat','mat','mat','mat','mat','mat','mat','mat','mat','broken','broken'];
 const PALETTE=['#4fd8ff','#a480ff','#e0b756','#ff8b7a'];
 const FLOOR_TINT=['#4fd8ff','#5de0c8','#a480ff','#d97fe0','#e0b756','#ff8b7a'];
 const FLOOR_RANK=['E','D','C','B','A','S'];
@@ -42,11 +51,15 @@ const GEAR={
   'Upgraded Bow':   { type:'weapon', line:'bow',   tier:2, cost:{'Golem Crystal':2}, requires:'Basic Bow', desc:'Reroll one die once, add the new value on top of the original total.' },
   'Basic Sword':    { type:'weapon', line:'sword', tier:1, cost:{'Golem Crystal':2}, desc:'+2 to the final roll total.' },
   'Upgraded Sword': { type:'weapon', line:'sword', tier:2, cost:{'Orc Tusk':3}, requires:'Basic Sword', desc:'+4 to the final roll total.' },
-  'Shield':         { type:'accessory', cost:{'Kasaka Fang':2,'Golem Crystal':1}, desc:'Prevents progress loss when a snake-eyes hunt finds no rival to steal from.' },
-  'Lucky Coin':     { type:'accessory', cost:{'Orc Tusk':2,'Oracle Wisp':1}, desc:'+1 extra material on a successful hunt.' },
-  'Compass':        { type:'accessory', cost:{'Kaisel Scale':1,'Orc Tusk':2}, desc:'+1 extra Ascension Progress on a successful hunt.' }
+  'Shield':         { type:'accessory', cost:{'Kasaka Fang':2,'Golem Crystal':1}, desc:'Prevents Ascension Progress loss on a failed hunt.' },
+  'Lucky Coin':     { type:'accessory', cost:{'Orc Tusk':2,'Oracle Wisp':1}, desc:'+1 extra loot on a successful hunt.' },
+  'Compass':        { type:'accessory', cost:{'Kaisel Scale':1,'Orc Tusk':2}, desc:'+1 extra Ascension Progress on a successful hunt.' },
+  // never crafted, only ever a lucky Loot Card draw (section 12)
+  'Broken Gear':    { type:'broken', cost:{}, desc:'Single use: +2 to one hunt, then it breaks.' }
 };
-const GEAR_ICON={ 'Basic Bow':'\u{1F3F9}', 'Upgraded Bow':'\u{1F3F9}✨', 'Basic Sword':'⚔️', 'Upgraded Sword':'\u{1F5E1}️', 'Shield':'\u{1F6E1}️', 'Lucky Coin':'\u{1F340}', 'Compass':'\u{1F9ED}' };
+const GEAR_ICON={ 'Basic Bow':'\u{1F3F9}', 'Upgraded Bow':'\u{1F3F9}✨', 'Basic Sword':'⚔️', 'Upgraded Sword':'\u{1F5E1}️', 'Shield':'\u{1F6E1}️', 'Lucky Coin':'\u{1F340}', 'Compass':'\u{1F9ED}', 'Broken Gear':'\u{1FA93}' };
+// a material is worth its floor, so the tiebreaker can price a mat at the end (section 17)
+const MAT_VALUE={}; floors.forEach(function(f,i){ MAT_VALUE[f.name]=i+1; });
 const EVENTS=[
   {label:'Windfall', apply:function(g,pools){const f=floors[g.idx]; if(pools[g.idx]>0&&addMat(g,f.name,1)){pools[g.idx]-=1; return g.name+' finds a Windfall cache: +1 '+f.name+'.';} return g.name+' finds a Windfall cache, but storage is full.';}},
   {label:'Ambush', apply:function(g){g.progress=Math.max(0,g.progress-1); return g.name+' is Ambushed by lesser beasts: -1 progress.';}},
@@ -179,7 +192,8 @@ document.getElementById('btnIdentityGo').onclick=async function(){
     state.guilds[0].claimedBy='local';
     for(let i=1;i<localN;i++){ state.guilds[i].isBot=true; state.guilds[i].claimedBy='bot'; }
     state.started=true;
-    state.log=[{t:'Practice game started. '+state.guilds[0].name+' (you) goes first.', cls:''}];
+    state.log=[{t:'Practice game started.', cls:''}];
+    rollForFirstPlayer(state);
     document.getElementById('roomTag').textContent='Local practice game';
     showGame();
     render();
@@ -238,6 +252,10 @@ function freshState(n){
     guilds: Array.from({length:n}, function(_,i){ return freshGuild(i); }),
     pools: floors.map(function(){ return START_POOL; }),
     current: 0,
+    roundStart: 0,
+    turnsThisRound: 0,
+    round: 1,
+    loot: null,
     winner: null,
     started: false,
     turnCount: 1,
@@ -321,7 +339,7 @@ function renderLobby(){
 document.getElementById('btnStartGame').onclick=async function(){
   const s=(await get(roomRef())).val();
   s.started=true;
-  s.log.unshift({t:s.guilds[0].name+' goes first.', cls:''});
+  rollForFirstPlayer(s);
   await set(roomRef(), s);
 };
 document.getElementById('btnAddBot').onclick=async function(){
@@ -380,6 +398,39 @@ function canAdd(g,name){ const mat=g.mat||{}; return mat.hasOwnProperty(name) ||
 function addMat(g,name,qty){ if(!canAdd(g,name)) return false; g.mat=g.mat||{}; g.mat[name]=(g.mat[name]||0)+qty; return true; }
 function stockKeys(g){ const mat=g.mat||{}; return Object.keys(mat).filter(function(k){return mat[k]>0;}); }
 function matTotal(g){ let t=0; for(const k in (g.mat||{})) t+=g.mat[k]; return t; }
+
+// section 3: each Guild rolls, the highest total goes first
+function rollForFirstPlayer(s){
+  let best=-1, first=0;
+  const rolls=s.guilds.map(function(g,i){
+    const r=2+Math.floor(Math.random()*6)+Math.floor(Math.random()*6);
+    if(r>best){ best=r; first=i; }
+    return g.name+' '+r;
+  });
+  s.current=first; s.roundStart=first; s.turnsThisRound=0; s.round=1;
+  s.log.unshift({t:'Seating roll: '+rolls.join(', ')+'. '+s.guilds[first].name+' goes first.', cls:''});
+}
+
+// section 9: leaving floors 3, 5 and 6 also costs a Floor Key, crafted and spent on the spot
+function keyFor(idx){ return KEYS[idx]||null; }
+function canPayKey(g,idx){
+  const k=keyFor(idx);
+  return !k || Object.keys(k.cost).every(function(m){ return (g.mat[m]||0)>=k.cost[m]; });
+}
+function canAscend(g){
+  const f=floors[g.idx];
+  return g.progress>=f.need && (g.mat[f.name]||0)>=f.toll && canPayKey(g,g.idx);
+}
+// section 17 leaves the tiebreak open, so: a material is worth its floor, gear is worth what it cost
+function guildValue(g){
+  let v=0;
+  for(const k in (g.mat||{})) v+=(MAT_VALUE[k]||0)*g.mat[k];
+  (g.gear||[]).forEach(function(name){
+    const cost=(GEAR[name]||{}).cost||{};
+    for(const k in cost) v+=(MAT_VALUE[k]||0)*cost[k];
+  });
+  return v;
+}
 function steal(from,to){ const keys=stockKeys(from); if(!keys.length) return null; const p=keys[Math.floor(Math.random()*keys.length)]; from.mat[p]-=1; if(from.mat[p]===0) delete from.mat[p]; return addMat(to,p,1)?p:null; }
 async function pushState(){ await set(roomRef(), state); }
 
@@ -459,8 +510,9 @@ function render(){
     btnSabotageToggle: !hasAP || !stockKeys(g0).length,
     btnTradeToggle: !canAct || !stockKeys(g0).length,
     btnBlacksmithToggle: !canAct,
-    btnTransmute: !canAct || matTotal(g0)<f.tcost,
-    btnAscend: !canAct || g0.progress<f.need || (g0.mat[f.name]||0)<f.toll
+    btnTransmute: !canAct || matTotal(g0)<TRANSMUTE_COST,
+    btnAscend: !canAct || !canAscend(g0),
+    btnScavenge: !canAct || g0.scavenged || canDoAnything(g0)
   };
   Object.keys(dis).forEach(function(id){ document.getElementById(id).disabled = dis[id]; });
   document.getElementById('btnEndTurn').disabled = !canAct;
@@ -473,8 +525,10 @@ function render(){
 
   document.getElementById('huntSub').textContent = '1 AP, 2d6 vs DR'+f.dr;
   document.getElementById('trainSub').textContent = '1 AP, 2 '+f.name;
-  document.getElementById('transmuteSub').textContent = f.tcost+' materials for 1';
-  document.getElementById('ascendSub').textContent = f.toll>0 ? ('pay '+f.toll+' '+f.name) : 'defeat the Sovereign';
+  document.getElementById('transmuteSub').textContent = TRANSMUTE_COST+' materials for 1 of choice';
+  const key=keyFor(me().idx);
+  document.getElementById('ascendSub').textContent =
+    (f.toll>0 ? 'pay '+f.toll+' '+f.name : 'defeat the Sovereign') + (key ? ' + '+key.name+' ('+keyCostText(me().idx)+')' : '');
 
   renderPlacemat();
   renderOutbreakBadge();
@@ -659,7 +713,7 @@ function renderDice(){
     return;
   }
   const resultCls = h.snake ? 'fail' : h.crit ? 'crit' : h.success ? 'success' : 'fail';
-  const resultText = h.snake ? (h.stolenFrom ? (h.guildName+' steals from '+h.stolenFrom+'!') : (h.guildName+' loses 1 progress.'))
+  const resultText = h.snake ? (h.shielded ? (h.guildName+"'s Shield absorbs the natural 2.") : (h.guildName+' loses 1 banked progress.'))
     : h.crit ? 'Critical hunt! +2 progress, action point refunded.'
     : h.success ? 'Success! +1 progress.'
     : 'Failed.';
@@ -696,6 +750,10 @@ function refreshTargetSelects(){
   wantMat.innerHTML = allMats.map(function(m){return '<option value="'+m+'">'+m+'</option>';}).join('');
   const wantQty=document.getElementById('tradeWantQty');
   wantQty.innerHTML = [1,2,3].map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
+  const tTarget=document.getElementById('transmuteTarget');
+  const tPrev=tTarget.value;
+  tTarget.innerHTML = allMats.map(function(m){return '<option value="'+m+'">'+m+'</option>';}).join('');
+  if(tPrev) tTarget.value=tPrev;
   const sabMat=document.getElementById('sabMat');
   sabMat.innerHTML = stockKeys(me()).map(function(k){return '<option value="'+k+'">'+k+'</option>';}).join('') || '<option value="">none</option>';
 }
@@ -779,22 +837,80 @@ function triggerOutbreak(){
 }
 
 // ---- core actions (shared by human buttons and the AI bot) ----
+// section 17: after 12 rounds the highest climber wins, ties go to progress then to what they hold
+function endOnRoundLimit(){
+  let bestIdx=0;
+  state.guilds.forEach(function(g,i){
+    const b=state.guilds[bestIdx];
+    if(g.idx>b.idx) bestIdx=i;
+    else if(g.idx===b.idx && g.progress>b.progress) bestIdx=i;
+    else if(g.idx===b.idx && g.progress===b.progress && guildValue(g)>guildValue(b)) bestIdx=i;
+  });
+  state.winner=bestIdx;
+  addLog('Round '+ROUND_LIMIT+' is over. '+state.guilds[bestIdx].name+' has climbed the highest (Floor '+(state.guilds[bestIdx].idx+1)+', '+guildValue(state.guilds[bestIdx])+' in materials and gear) and wins.', 'wn');
+}
+
 function endTurnAction(){
   if(state.winner!==null && state.winner!==undefined) return;
-  const wrapped = nextIndex()===0;
-  state.current=nextIndex();
+  const n=state.guilds.length;
+  state.turnsThisRound=(state.turnsThisRound||0)+1;
+  const wrapped = state.turnsThisRound>=n;
+  if(wrapped){
+    // section 3: turn order rotates by one seat each round
+    state.turnsThisRound=0;
+    state.round=(state.round||1)+1;
+    state.roundStart=((state.roundStart||0)+1)%n;
+    state.current=state.roundStart;
+  } else {
+    state.current=(state.current+1)%n;
+  }
   state.turnCount=(state.turnCount||1)+1;
   state.lastHunt=null;
   const g=me();
-  g.ap=2; g.hexCurse=false;
+  g.ap=2; g.hexCurse=false; g.scavenged=false;
   checkFloorCamping(g);
-  addLog('--- '+g.name+"'s turn begins. ---");
+  addLog('--- '+g.name+"'s turn begins (round "+state.round+" of "+ROUND_LIMIT+"). ---");
   maybeDrawEvent(g);
   if(wrapped){
     if(state.outbreakTimer===undefined || state.outbreakTimer===null) resetOutbreakTimer();
     state.outbreakTimer-=1;
     if(state.outbreakTimer<=0) triggerOutbreak();
+    if(state.round>ROUND_LIMIT) endOnRoundLimit();
   }
+}
+
+// section 5: a successful hunt draws a Loot Card, usually the floor's material
+function drawLoot(g){
+  if(!state.loot || !state.loot.length){
+    state.loot=LOOT_DECK.slice();
+    for(let i=state.loot.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=state.loot[i]; state.loot[i]=state.loot[j]; state.loot[j]=t; }
+  }
+  const card=state.loot.pop();
+  g.gear=g.gear||[];
+  if(card==='broken' && g.gear.length<GEAR_SLOTS){ g.gear.push('Broken Gear'); return 'a piece of Broken Gear'; }
+  const f=floors[g.idx];
+  if(state.pools[g.idx]>0 && addMat(g,f.name,1)){ state.pools[g.idx]-=1; return '1 '+f.name; }
+  return null;
+}
+
+// section 10: the fallback that keeps a stuck Guild from waiting forever
+function canDoAnything(g){
+  if(g.ap>0) return true;
+  if(canAscend(g)) return true;
+  if(matTotal(g)>=TRANSMUTE_COST) return true;
+  return stockKeys(g).length>0 && others().some(function(o){ return stockKeys(o.g).length>0; });
+}
+function scavengeAction(){
+  const g=me();
+  if(g.scavenged){ addLog('Desperate Scavenge is once per turn.'); return; }
+  if(canDoAnything(g)){ addLog(g.name+' still has a legal action, Desperate Scavenge is not available.'); return; }
+  let from=g.idx;
+  while(from>=0 && state.pools[from]<=0) from-=1;
+  const name = from>=0 ? floors[from].name : floors[g.idx].name;   // otherwise the general supply
+  if(!addMat(g,name,1)){ addLog(g.name+' has no free material slot to scavenge into.'); return; }
+  if(from>=0) state.pools[from]-=1;
+  g.scavenged=true;
+  addLog(g.name+' is out of options and Desperate Scavenges 1 '+name+'.', 'ev');
 }
 function huntAction(){
   const g=me(), f=floors[g.idx];
@@ -806,6 +922,7 @@ function huntAction(){
   const hasUpBow=gear.includes('Upgraded Bow'), hasBasicBow=gear.includes('Basic Bow');
   const hasUpSword=gear.includes('Upgraded Sword'), hasBasicSword=gear.includes('Basic Sword');
   const hasShield=gear.includes('Shield'), hasCoin=gear.includes('Lucky Coin'), hasCompass=gear.includes('Compass');
+  const hasBroken=gear.includes('Broken Gear');
 
   let d1=1+Math.floor(Math.random()*6), d2=1+Math.floor(Math.random()*6);
   let bowBonus=0, gearNote='';
@@ -817,43 +934,42 @@ function huntAction(){
   }
   const swordBonus = hasUpSword?4:(hasBasicSword?2:0);
   if(swordBonus) gearNote+=' (+'+swordBonus+' sword)';
+  let brokenBonus=0;
+  if(hasBroken){ brokenBonus=2; gearNote+=' (Broken Gear +2, breaks)'; g.gear=gear.filter(function(x){ return x!=='Broken Gear'; }); }
 
   const behind=trailing();
-  let total=d1+d2+bowBonus+swordBonus+(behind?1:0)-(g.hexCurse?2:0);
+  let total=d1+d2+bowBonus+swordBonus+brokenBonus+(behind?1:0)-(g.hexCurse?2:0);
   g.ap-=1;
   state.rollSeq=(state.rollSeq||0)+1;
   const hunt={ seq:state.rollSeq, guildName:g.name, matName:f.name, d1:d1, d2:d2, total:total, dr:f.dr, snake:false, crit:false, success:false, stolenFrom:null, gearNote:gearNote };
 
   function successExtras(){
     let extra='';
-    if(hasCoin && state.pools[g.idx]>0 && addMat(g,f.name,1)){ state.pools[g.idx]-=1; extra+=' Lucky Coin: +1 extra '+f.name+'.'; }
+    if(hasCoin){ const bonus=drawLoot(g); if(bonus) extra+=' Lucky Coin: +'+bonus+'.'; }
     if(hasCompass){ g.progress+=1; extra+=' Compass: +1 extra progress.'; }
     return extra;
   }
 
   if(d1===6&&d2===6){
-    g.progress+=2; if(state.pools[g.idx]>0&&addMat(g,f.name,1)) state.pools[g.idx]-=1;
+    g.progress+=2;
+    const loot=drawLoot(g);
     g.ap+=1;
     hunt.crit=true; hunt.success=true;
-    addLog(g.name+' rolls double sixes! Critical hunt: +2 progress, action point refunded.'+gearNote+successExtras());
+    addLog(g.name+' rolls double sixes! Critical hunt: +2 progress'+(loot?', loot: '+loot:'')+', action point refunded.'+gearNote+successExtras());
   } else if(d1===1&&d2===1){
-    hunt.snake=true;
-    const targets=others().filter(function(o){return stockKeys(o.g).length;});
-    if(targets.length){
-      const t=targets[Math.floor(Math.random()*targets.length)].g;
-      const s=steal(t,g);
-      hunt.stolenFrom=t.name;
-      addLog(g.name+' rolls snake eyes and raids the vault, stealing 1 '+s+' from '+t.name+'.', 'st');
-    } else if(hasShield){
-      addLog(g.name+' rolls snake eyes, but the Shield absorbs it, no penalty.', 'st');
+    // section 5: a natural 2 is the only roll that costs banked progress
+    hunt.snake=true; hunt.shielded=hasShield;
+    if(hasShield){
+      addLog(g.name+' rolls a natural 2, but the Shield absorbs it, no progress lost.', 'st');
     } else {
       g.progress=Math.max(0,g.progress-1);
-      addLog(g.name+' rolls snake eyes. No rival has anything to steal, -1 progress instead.', 'st');
+      addLog(g.name+' rolls a natural 2 and loses 1 banked Ascension Progress.', 'st');
     }
   } else if(total>=f.dr){
     g.progress+=1;
     hunt.success=true;
-    if(state.pools[g.idx]>0 && addMat(g,f.name,1)){ state.pools[g.idx]-=1; addLog(g.name+' rolls '+total+(behind?' (+1 catch-up)':'')+(g.hexCurse?' (-2 cursed)':'')+gearNote+' vs DR'+f.dr+', success: +1 progress, +1 '+f.name+'.'+successExtras()); }
+    const loot=drawLoot(g);
+    if(loot) addLog(g.name+' rolls '+total+(behind?' (+1 catch-up)':'')+(g.hexCurse?' (-2 cursed)':'')+gearNote+' vs DR'+f.dr+', success: +1 progress, loot: '+loot+'.'+successExtras());
     else addLog(g.name+' succeeds but storage is full or the pool is empty. Progress only.'+successExtras());
   } else {
     addLog(g.name+' rolls '+total+(behind?' (+1 catch-up)':'')+(g.hexCurse?' (-2 cursed)':'')+gearNote+' vs DR'+f.dr+', failed. Action point spent.');
@@ -888,6 +1004,7 @@ function eligibleGear(g){
   const owned=g.gear||[];
   return Object.keys(GEAR).filter(function(name){
     const def=GEAR[name];
+    if(def.type==='broken') return false;   // Broken Gear only ever comes from a Loot Card
     if(owned.includes(name)) return false;
     if(def.requires) return owned.includes(def.requires);
     if(def.type==='accessory' && owned.some(function(o){ return GEAR[o]&&GEAR[o].type==='accessory'; })) return false;
@@ -919,26 +1036,47 @@ function craftAction(itemName){
   g.gear.push(itemName);
   addLog(g.name+' crafts a '+itemName+'.');
 }
-function transmuteAction(){
-  const g=me(), f=floors[g.idx];
+// section 8: discard any 3 materials, any mix, to receive 1 material of choice
+function transmuteAction(target){
+  const g=me();
   const total=matTotal(g);
-  if(total>=f.tcost){
-    let toSpend=f.tcost;
-    for(const k of Object.keys(g.mat||{})){ if(toSpend<=0) break; const take=Math.min(g.mat[k],toSpend); g.mat[k]-=take; toSpend-=take; if(g.mat[k]===0) delete g.mat[k]; }
-    addMat(g,f.name,1);
-    addLog(g.name+' transmutes '+f.tcost+' materials into 1 '+f.name+'.');
-  } else addLog(g.name+' needs '+f.tcost+' total materials to transmute, has '+total+'.');
+  if(total<TRANSMUTE_COST){ addLog(g.name+' needs '+TRANSMUTE_COST+' materials to transmute, has '+total+'.'); return; }
+  if(!canAdd(g,target)){ addLog(g.name+' has no free material slot for '+target+'.'); return; }
+  let toSpend=TRANSMUTE_COST;
+  // spend the other materials first, so asking for more of what you hold still works
+  const order=stockKeys(g).sort(function(a,b){ return (a===target?1:0)-(b===target?1:0); });
+  for(const k of order){
+    if(toSpend<=0) break;
+    const take=Math.min(g.mat[k],toSpend);
+    g.mat[k]-=take; toSpend-=take;
+    if(g.mat[k]===0) delete g.mat[k];
+  }
+  addMat(g,target,1);
+  addLog(g.name+' transmutes '+TRANSMUTE_COST+' materials into 1 '+target+'.');
 }
 function ascendAction(){
   const g=me(), f=floors[g.idx];
-  if(g.progress>=f.need && (g.mat[f.name]||0)>=f.toll){
+  if(canAscend(g)){
     if(f.toll>0){ g.mat[f.name]-=f.toll; if(g.mat[f.name]===0) delete g.mat[f.name]; }
+    const key=keyFor(g.idx);
+    if(key){
+      for(const m in key.cost){ g.mat[m]-=key.cost[m]; if(g.mat[m]<=0) delete g.mat[m]; }
+      addLog(g.name+' crafts and spends the '+key.name+'.', 'ev');
+    }
     const clearedIdx=g.idx;
     if(g.idx===floors.length-1){ state.winner=state.current; addLog(g.name+' defeats the Sovereign and wins the game.', 'wn'); }
     else { g.idx+=1; g.progress=0; g.turnsOnFloor=1; addLog(g.name+' ascends to Floor '+(g.idx+1)+'.'); }
     SFX.climb();
     if(clearedIdx>state.clearedThrough){ state.clearedThrough=clearedIdx; resetOutbreakTimer(); addLog('Floor '+(clearedIdx+1)+' is cleared for the first time, the Outbreak Timer moves up.', 'ev'); }
-  } else addLog(g.name+' needs '+f.need+' progress (has '+g.progress+') and '+f.toll+' '+f.name+' toll (has '+(g.mat[f.name]||0)+').');
+  } else {
+    const key=keyFor(g.idx);
+    addLog(g.name+' needs '+f.need+' progress (has '+g.progress+')'+(f.toll?', '+f.toll+' '+f.name+' toll (has '+(g.mat[f.name]||0)+')':'')+(key?', and the '+key.name+' ('+keyCostText(g.idx)+')':'')+'.');
+  }
+}
+function keyCostText(idx){
+  const key=keyFor(idx);
+  if(!key) return '';
+  return Object.keys(key.cost).map(function(m){ return key.cost[m]+' '+m; }).join(' + ');
 }
 
 // ---- button wiring (human only, gated by isMyTurn) ----
@@ -946,7 +1084,19 @@ document.getElementById('btnEndTurn').onclick=function(){ if(!isMyTurn()) return
 document.getElementById('btnHunt').onclick=function(){ if(!isMyTurn()) return; withState(huntAction); };
 document.getElementById('btnTrain').onclick=function(){ if(!isMyTurn()) return; withState(trainAction); };
 document.getElementById('btnRaid').onclick=function(){ if(!isMyTurn()) return; withState(raidAction); };
-document.getElementById('btnTransmute').onclick=function(){ if(!isMyTurn()) return; withState(transmuteAction); };
+document.getElementById('btnTransmute').onclick=function(){
+  document.getElementById('transmutePanel').classList.toggle('show');
+  ['tradePanel','sabotagePanel','blacksmithPanel'].forEach(function(id){ document.getElementById(id).classList.remove('show'); });
+  refreshTargetSelects();
+};
+document.getElementById('btnCancelTransmute').onclick=function(){ document.getElementById('transmutePanel').classList.remove('show'); };
+document.getElementById('btnDoTransmute').onclick=function(){
+  if(!isMyTurn()) return;
+  const target=document.getElementById('transmuteTarget').value;
+  withState(function(){ transmuteAction(target); });
+  document.getElementById('transmutePanel').classList.remove('show');
+};
+document.getElementById('btnScavenge').onclick=function(){ if(!isMyTurn()) return; withState(scavengeAction); };
 document.getElementById('btnAscend').onclick=function(){ if(!isMyTurn()) return; withState(ascendAction); };
 
 document.getElementById('btnTradeToggle').onclick=function(){ document.getElementById('tradePanel').classList.toggle('show'); document.getElementById('sabotagePanel').classList.remove('show'); refreshTargetSelects(); };
@@ -1057,9 +1207,18 @@ function botStep(){
   if(state.winner!==null && state.winner!==undefined) return;
   const g=me();
   if(!g.isBot) return;
-  if(g.ap<=0){ withState(endTurnAction); return; }
   const f=floors[g.idx];
-  if(g.progress>=f.need && (g.mat[f.name]||0)>=f.toll){ withState(ascendAction); return; }
+  if(canAscend(g)){ withState(ascendAction); return; }
+  if(!canDoAnything(g) && !g.scavenged){ withState(scavengeAction); return; }
+  // ready to climb but short a toll or Key material: buy it at the camp
+  if(g.progress>=f.need && matTotal(g)>=TRANSMUTE_COST){
+    const want=[];
+    if((g.mat[f.name]||0)<f.toll) want.push(f.name);
+    const key=keyFor(g.idx);
+    if(key) for(const m in key.cost){ if((g.mat[m]||0)<key.cost[m]) want.push(m); }
+    if(want.length && canAdd(g,want[0])){ withState(function(){ transmuteAction(want[0]); }); return; }
+  }
+  if(g.ap<=0){ withState(endTurnAction); return; }
   if((g.gear||[]).length<2){
     const options=eligibleGear(g).filter(function(name){ return GEAR[name].type==='weapon'; });
     const craftable=options.find(function(name){ return affordGear(g,GEAR[name].cost); });
