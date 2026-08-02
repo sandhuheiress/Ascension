@@ -56,6 +56,40 @@ const EVENTS=[
   {label:'Quiet floor', apply:function(){ return 'The floor is quiet. Nothing happens.';}}
 ];
 
+// ---- sound: short synthesised cues, no audio files and no library ----
+let actx=null, muted=localStorage.getItem('ascension_muted')==='1';
+function tone(freq, dur, type, vol, delay){
+  if(!actx || muted) return;
+  const t=actx.currentTime+(delay||0);
+  const o=actx.createOscillator(), g=actx.createGain();
+  o.type=type; o.frequency.setValueAtTime(freq,t);
+  g.gain.setValueAtTime(0.0001,t);
+  g.gain.exponentialRampToValueAtTime(vol,t+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(t); o.stop(t+dur+0.02);
+}
+const SFX={
+  roll: function(){ for(let i=0;i<5;i++) tone(210+Math.random()*280,0.05,'square',0.05,i*0.07); },
+  success: function(){ tone(523,0.12,'triangle',0.16); tone(784,0.22,'triangle',0.13,0.10); },
+  crit: function(){ [523,784,1047].forEach(function(f,i){ tone(f,i===2?0.3:0.1,'triangle',0.15,i*0.09); }); },
+  fail: function(){ tone(196,0.22,'sawtooth',0.10); tone(147,0.30,'sawtooth',0.08,0.06); },
+  climb: function(){ [392,523,659,880].forEach(function(f,i){ tone(f,0.22,'triangle',0.13,i*0.08); }); },
+  gain: function(){ tone(880,0.07,'sine',0.11); tone(1175,0.10,'sine',0.09,0.06); },
+  outbreak: function(){ tone(110,0.5,'sawtooth',0.13); tone(104,0.6,'sawtooth',0.11,0.12); }
+};
+// browsers refuse to play audio until the user has interacted with the page
+document.addEventListener('pointerdown', function(){
+  if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
+  if(actx.state==='suspended') actx.resume();
+});
+document.getElementById('btnSound').onclick=function(){
+  muted=!muted;
+  localStorage.setItem('ascension_muted', muted?'1':'0');
+  this.textContent = muted ? '\u{1F507}' : '\u{1F50A}';
+};
+document.getElementById('btnSound').textContent = muted ? '\u{1F507}' : '\u{1F50A}';
+
 let deviceId = localStorage.getItem('ascension_device_id');
 if(!deviceId){ deviceId='d'+Math.random().toString(36).slice(2,10); localStorage.setItem('ascension_device_id', deviceId); }
 
@@ -491,6 +525,7 @@ function renderPlacemat(){
     return '<div class="matChip gear'+(fresh?' fresh':'')+'"><span class="ic">'+ic+'</span><span>'+name+'</span></div>';
   });
   prevGear=gear.slice();
+  if(matChips.concat(gearChips).some(function(c){ return c.indexOf('fresh')>=0; })) SFX.gain();
 
   // draw the unused slots too, so the storage cap is visible like a printed player board
   function pad(chips, slots){
@@ -504,50 +539,47 @@ function renderPlacemat(){
   document.getElementById('placematGear').innerHTML = pad(gearChips, GEAR_SLOTS);
 }
 
-// FLIP: pawns keep their screen position across a re-render and slide to the new one
-function capturePawns(){
-  const seen={};
-  document.querySelectorAll('#towerList .pawn').forEach(function(p){
-    seen[p.dataset.g]=p.getBoundingClientRect();
-  });
-  return seen;
-}
-function animatePawns(before){
-  document.querySelectorAll('#towerList .pawn').forEach(function(p){
-    const from=before[p.dataset.g];
-    if(!from){
-      p.animate([{opacity:0, transform:'translateY(-10px) scale(0.6)'},{opacity:1, transform:'none'}],
-                {duration:260, easing:'ease-out'});
-      return;
-    }
-    const to=p.getBoundingClientRect();
-    const dx=from.left-to.left, dy=from.top-to.top;
-    if(Math.abs(dx)<1 && Math.abs(dy)<1) return;
-    // lifted arc, the way a hand picks a piece up and sets it down
-    p.animate([
-      {transform:'translate('+dx+'px,'+dy+'px)'},
-      {transform:'translate('+(dx/2)+'px,'+(dy/2-22)+'px) scale(1.18)', offset:0.55},
-      {transform:'none'}
-    ], {duration:560, easing:'cubic-bezier(0.34,1.1,0.5,1)'});
+// which platform and step each pawn was standing on last time the tower was drawn
+const pawnAt={};
+const PLAT_TILT=50;
+
+// a pawn that changed step walks along its platform; one that changed floor drops onto the new one
+function movePawns(){
+  document.querySelectorAll('#towerList .stand').forEach(function(st){
+    const gi=parseInt(st.dataset.g,10);
+    const cell=st.parentElement;
+    const key=state.guilds[gi].idx+':'+cell.dataset.s;
+    const was=pawnAt[gi];
+    pawnAt[gi]=key;
+    if(was===undefined || was===key) return;
+    if(was.split(':')[0]!==String(state.guilds[gi].idx)){ st.classList.add('arriving'); return; }
+    const prev=cell.parentElement.querySelector('.step[data-s="'+was.split(':')[1]+'"]');
+    if(!prev) return;
+    const dx=prev.offsetLeft-cell.offsetLeft;
+    st.animate([
+      {transform:'rotateX(-'+PLAT_TILT+'deg) translateX('+dx+'px)'},
+      {transform:'rotateX(-'+PLAT_TILT+'deg) translateX('+(dx/2)+'px) translateY(-14px)', offset:0.5},
+      {transform:'rotateX(-'+PLAT_TILT+'deg) translateX(0)'}
+    ], {duration:460, easing:'cubic-bezier(0.3,1,0.4,1)'});
   });
 }
 
 function renderTower(){
   const list=document.getElementById('towerList');
-  const before=capturePawns();
+  const cam=me().idx;
   const rows=[];
-  for(let i=floors.length-1;i>=0;i--){
+  for(let i=0;i<floors.length;i++){
     const fl=floors[i];
     const here=state.guilds.filter(function(g){return g.idx===i;});
     const hereNow=here.some(function(g){return state.guilds.indexOf(g)===state.current;});
 
-    // the path across the floor: a guild standing on step s has s ascension progress
+    // the path across the platform: a guild standing on step s has s ascension progress
     let track='';
     for(let s=0;s<=fl.need;s++){
       const onStep=here.filter(function(g){ return Math.min(g.progress, fl.need)===s; });
-      track+='<span class="step'+(s===fl.need?' last':'')+'">'+onStep.map(function(g){
+      track+='<span class="step'+(s===fl.need?' last':'')+'" data-s="'+s+'">'+onStep.map(function(g){
         const gi=state.guilds.indexOf(g);
-        return '<span class="pawn'+(gi===state.current?' turnNow':'')+'" data-g="'+gi+'" style="color:'+g.color+'" title="'+g.name+', '+g.progress+'/'+fl.need+' progress"></span>';
+        return '<span class="stand" data-g="'+gi+'"><span class="pawn'+(gi===state.current?' turnNow':'')+'" style="color:'+g.color+'" title="'+g.name+', '+g.progress+'/'+fl.need+' progress"></span></span>';
       }).join('')+'</span>';
     }
     track += fl.toll>0
@@ -561,7 +593,7 @@ function renderTower(){
     }
 
     rows.push(
-      '<div class="floorRow'+(hereNow?' hereNow':'')+'" style="--tint:'+FLOOR_TINT[i]+';">'+
+      '<div class="plat'+(hereNow?' hereNow':'')+(i<cam?' past':'')+(i===floors.length-1?' top':'')+'" style="--i:'+i+'; --tint:'+FLOOR_TINT[i]+';">'+
         '<div class="frHead">'+
           '<span class="frNum">'+(i+1)+'</span>'+
           '<span class="frIcon" title="'+fl.name+'">'+FLOOR_ICON[i]+'</span>'+
@@ -578,7 +610,9 @@ function renderTower(){
     );
   }
   list.innerHTML=rows.join('');
-  animatePawns(before);
+  // the camera rides with whoever is playing, so climbing actually feels like climbing
+  list.style.transform='rotateX('+PLAT_TILT+'deg) translate3d(0,'+(cam*182)+'px,'+(-cam*20)+'px)';
+  movePawns();
 }
 
 function popAnimate(el){
@@ -639,6 +673,8 @@ function renderDice(){
     lastRollKey=key;
     throwDie(document.getElementById('dc1'), h.d1);
     throwDie(document.getElementById('dc2'), h.d2);
+    SFX.roll();
+    setTimeout(function(){ (h.crit ? SFX.crit : h.success ? SFX.success : SFX.fail)(); }, 460);
   }
 }
 
@@ -737,6 +773,7 @@ function triggerOutbreak(){
     const loss = i===leadIdx ? 2 : 1;
     g.progress=Math.max(0,g.progress-loss);
   });
+  SFX.outbreak();
   addLog('Monster Outbreak on Floor '+(state.outbreakFloor+1)+'! '+state.guilds[leadIdx].name+' (furthest ahead) loses 2 progress, every other Guild loses 1.', 'st');
   resetOutbreakTimer();
 }
@@ -899,6 +936,7 @@ function ascendAction(){
     const clearedIdx=g.idx;
     if(g.idx===floors.length-1){ state.winner=state.current; addLog(g.name+' defeats the Sovereign and wins the game.', 'wn'); }
     else { g.idx+=1; g.progress=0; g.turnsOnFloor=1; addLog(g.name+' ascends to Floor '+(g.idx+1)+'.'); }
+    SFX.climb();
     if(clearedIdx>state.clearedThrough){ state.clearedThrough=clearedIdx; resetOutbreakTimer(); addLog('Floor '+(clearedIdx+1)+' is cleared for the first time, the Outbreak Timer moves up.', 'ev'); }
   } else addLog(g.name+' needs '+f.need+' progress (has '+g.progress+') and '+f.toll+' '+f.name+' toll (has '+(g.mat[f.name]||0)+').');
 }

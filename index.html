@@ -90,43 +90,51 @@
 </div>
 
 <div id="game">
-  <div class="gameHead">
-    <span class="roomTag" id="roomTag"></span>
-    <div style="display:flex; align-items:center; gap:10px;">
-      <div class="avatarRow" id="headerAvatars"></div>
-      <button class="howBtn" id="btnHowToGame">How to play</button>
-      <button class="leaveBtn" id="btnLeaveGame">Leave game</button>
+  <!-- the world: a 3D tower you climb. everything else is a HUD layer on top of it -->
+  <div id="world"><div id="towerList"></div></div>
+
+  <div class="hudTop">
+    <div class="gameHead">
+      <span class="roomTag" id="roomTag"></span>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div class="avatarRow" id="headerAvatars"></div>
+        <button class="howBtn" id="btnSound" title="Sound on or off">&#x1F50A;</button>
+        <button class="howBtn" id="btnHowToGame">How to play</button>
+        <button class="leaveBtn" id="btnLeaveGame">Leave game</button>
+      </div>
+    </div>
+    <div class="turnBanner glass" id="turnBanner"></div>
+    <div id="outbreakBadge" class="outbreakBadge glass"></div>
+  </div>
+
+  <div class="hudLeft">
+    <div id="myPlacemat" class="placemat glass">
+      <h4>Your Supplies</h4>
+      <div class="placematCols">
+        <div class="placematCol">
+          <div class="pmLabel" id="pmMatLabel">Materials</div>
+          <div class="matRow" id="placematMats"></div>
+        </div>
+        <div class="placematCol gearCol">
+          <div class="pmLabel" id="pmGearLabel">Gear</div>
+          <div class="matRow" id="placematGear"></div>
+        </div>
+      </div>
     </div>
   </div>
 
-  <div class="layout">
-    <div class="towerPanel glass">
-      <h3>The Tower</h3>
-      <div id="outbreakBadge" class="outbreakBadge"></div>
-      <div id="towerList"></div>
+  <div class="hudSide">
+    <div class="arena" id="arena"></div>
+    <div class="logPanel glass">
+      <h3>Activity Log</h3>
+      <div id="log"></div>
     </div>
+  </div>
 
-    <div class="mainCol">
-      <div class="turnBanner glass" id="turnBanner"></div>
+  <div class="hudBottom">
       <div id="winBanner" class="glass" style="display:none; padding:12px 18px; margin-bottom:14px; color:var(--gold); font-weight:600;"></div>
       <div id="tradeOfferBanner" class="glass"></div>
       <div id="diceReveal" class="glass"></div>
-
-      <div class="arena" id="arena"></div>
-
-      <div id="myPlacemat" class="placemat glass">
-        <h4>Your Supplies</h4>
-        <div class="placematCols">
-          <div class="placematCol">
-            <div class="pmLabel" id="pmMatLabel">Materials</div>
-            <div class="matRow" id="placematMats"></div>
-          </div>
-          <div class="placematCol gearCol">
-            <div class="pmLabel" id="pmGearLabel">Gear</div>
-            <div class="matRow" id="placematGear"></div>
-          </div>
-        </div>
-      </div>
 
       <div class="actionBar">
         <button class="act" id="btnHunt"><span class="lbl">Hunt</span><span class="sub" id="huntSub">1 AP</span></button>
@@ -180,12 +188,6 @@
         </div>
       </div>
 
-    </div>
-
-    <div class="logPanel glass">
-      <h3>Activity Log</h3>
-      <div id="log"></div>
-    </div>
   </div>
 </div>
 

@@ -166,45 +166,73 @@
   .logPanel { padding: 18px 16px; }
   .logPanel h3 { font-family:'Cinzel',serif; font-size: 13px; text-align:center; margin: 0 0 12px; color: var(--text-hi); letter-spacing: 1px; text-transform: uppercase; }
 
-  body.in-game #game { flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  body.in-game .gameHead { flex: 0 0 auto; margin-bottom: 8px; }
-  /* the board sits in the middle of the table, biggest thing on screen */
-  body.in-game .layout {
-    flex: 1; min-height: 0; align-items: stretch;
-    grid-template-columns: minmax(280px, 1fr) minmax(330px, 1.15fr) 215px;
-  }
-  body.in-game .mainCol { order: 1; }
-  body.in-game .towerPanel { order: 2; }
-  body.in-game .logPanel { order: 3; }
-  @media (max-width: 1100px) { body.in-game .layout { grid-template-columns: 1fr 1fr 190px; } }
-  @media (max-width: 900px) {
-    body.in-game .layout { grid-template-columns: 1fr; }
-    body.in-game .towerPanel { order: 0; }
-    body.in-game .mainCol, body.in-game .towerPanel, body.in-game .logPanel { max-height: none; }
-  }
-  body.in-game .towerPanel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-  body.in-game .towerPanel #towerList { flex: 1; min-height: 0; overflow-y: auto; padding-right: 6px; }
-  body.in-game .mainCol { min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
-  body.in-game .logPanel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
-  body.in-game .logPanel #log { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }
-  body.in-game .towerPanel { padding: 16px 16px; }
-  body.in-game .towerPanel h3 { margin-bottom: 10px; }
-  body.in-game .turnBanner, body.in-game .arena,
-  body.in-game .placemat, body.in-game .ascendRow, body.in-game #diceReveal { margin-bottom: 8px; }
-  body.in-game .actionBar { margin-bottom: 8px; }
-  body.in-game button.act.end { margin-bottom: 8px; }
-  /* while a trade/sabotage/blacksmith panel is open, hide the action grid to make room and avoid clipping */
-  body.in-game .mainCol:has(.panelInline.show) .actionBar,
-  body.in-game .mainCol:has(.panelInline.show) .ascendRow,
-  body.in-game .mainCol:has(.panelInline.show) button.act.end,
-  body.in-game .mainCol:has(.panelInline.show) .placemat { display: none; }
+  /* in game the world fills the screen and every panel floats over it */
+  body.in-game { max-width: none; padding: 0; overflow: hidden; display: block; }
+  body.in-game #game { position: fixed; inset: 0; display: block; }
 
-  .towerPanel { padding: 20px 18px; }
-  .towerPanel h3 { font-family:'Cinzel',serif; font-size: 15px; text-align:center; margin: 0 0 16px; color: var(--text-hi); letter-spacing: 1px; }
+  #world { position: absolute; inset: 0; overflow: hidden; perspective: 1150px; perspective-origin: 50% 52%; }
+  /* the tower itself, tilted away from the camera; it slides to follow the climbing guild */
+  #towerList {
+    position: absolute; left: 50%; bottom: 37%; width: 0; height: 0;
+    transform-style: preserve-3d;
+    transform: rotateX(50deg);
+    transition: transform 0.9s cubic-bezier(0.3,0.85,0.35,1);
+  }
+
+  .hudTop { position: absolute; top: 0; left: 0; right: 0; padding: 12px 16px 0; z-index: 5; pointer-events: none; }
+  .hudTop > * { pointer-events: auto; }
+  .hudTop .gameHead { margin-bottom: 8px; }
+  .hudTop .turnBanner { max-width: 460px; margin: 0 0 8px; }
+  .hudTop .outbreakBadge { max-width: 260px; margin: 0; }
+
+  .hudSide { position: absolute; top: 14px; right: 16px; width: 228px; z-index: 5; display: flex; flex-direction: column; gap: 8px; }
+  .hudSide .logPanel { max-height: 34vh; display: flex; flex-direction: column; padding: 12px 12px; }
+  .hudSide .logPanel #log { flex: 1; min-height: 0; overflow-y: auto; }
+
+  /* your own supplies sit at the left edge, out of the tower's way */
+  .hudLeft { position: absolute; left: 16px; bottom: 16px; width: 250px; z-index: 5; }
+  .hudLeft .placemat { padding: 12px 14px; margin: 0; }
+  .hudLeft .placematCols { grid-template-columns: 1fr; gap: 10px; }
+  .hudLeft .placematCol.gearCol { border-left: none; padding-left: 0; border-top: 1px solid rgba(255,255,255,0.10); padding-top: 10px; }
+
+  .hudBottom {
+    position: absolute; left: 50%; bottom: 0; transform: translateX(-50%);
+    width: min(640px, calc(100% - 560px)); padding: 0 12px 12px; z-index: 5;
+  }
+  .hudBottom > * { margin-bottom: 8px; }
+  /* the HUD floats over the world, so it stays readable without hiding the tower */
+  .hudTop .glass, .hudTop .outbreakBadge, .hudSide .glass, .hudBottom .glass, .hudBottom button.act {
+    backdrop-filter: blur(7px);
+  }
+  .hudTop .glass, .hudSide .glass, .hudBottom .glass {
+    background: linear-gradient(180deg, rgba(24,26,44,0.80), rgba(18,19,31,0.86));
+  }
+  .hudBottom button.act { background: rgba(18,19,31,0.78); }
+  .hudLeft .placemat { background: linear-gradient(160deg, rgba(224,183,86,0.10), rgba(18,19,31,0.86)); backdrop-filter: blur(7px); }
+  .hudLeft .placemat h4 { margin-bottom: 10px; }
+  .hudBottom button.act { padding: 6px 8px; }
+  .hudBottom button.act.ascend { padding: 9px 12px; }
+  .hudBottom button.act.end { padding: 8px; margin-bottom: 0; }
+  .hudBottom .actionBar { gap: 6px; margin-bottom: 8px; }
+  /* the roll reads as one compact strip instead of a tall card */
+  .hudBottom #diceReveal { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 8px 14px; text-align: left; }
+  .hudBottom #diceReveal .diceRow { margin: 0; }
+  .hudBottom #diceReveal p { margin: 0; }
+  .hudBottom #diceReveal .resultLine { font-size: 13px; }
+  /* while a trade/sabotage/blacksmith panel is open, hide the action grid to make room */
+  .hudBottom:has(.panelInline.show) .actionBar,
+  .hudBottom:has(.panelInline.show) .ascendRow,
+  .hudBottom:has(.panelInline.show) button.act.end,
+  .hudBottom:has(.panelInline.show) .placemat { display: none; }
+  @media (max-width: 1180px) {
+    .hudSide, .hudLeft { display: none; }
+    .hudBottom { width: calc(100% - 24px); }
+  }
+
   .outbreakBadge {
     display:flex; align-items:center; justify-content:space-between; gap:8px;
-    padding: 10px 12px; margin-bottom: 16px; border-radius: 10px;
-    background: rgba(255,139,122,0.08); border: 1px solid rgba(255,139,122,0.35);
+    padding: 8px 12px; border-radius: 10px;
+    background: rgba(255,139,122,0.10); border: 1px solid rgba(255,139,122,0.35);
   }
   .outbreakBadge .obLabel { font-size: 10.5px; text-transform:uppercase; letter-spacing:0.5px; color: var(--text-mid); line-height:1.4; }
   .outbreakBadge .obLabel b { display:block; color: var(--coral); font-family:'Cinzel',serif; font-size: 11.5px; letter-spacing:0.5px; }
@@ -213,70 +241,93 @@
   .outbreakBadge.warn .obCount { color: #ff5a42; }
   @keyframes pulseWarn { 0%,100%{ box-shadow: 0 0 6px rgba(255,80,60,0.25);} 50%{ box-shadow: 0 0 16px rgba(255,80,60,0.55);} }
   /* one floor of the tower: a chamber you walk across before the gate opens */
-  .floorRow {
-    position: relative; border-radius: 12px; padding: 6px 10px 6px 12px; margin-bottom: 11px;
-    border: 1px solid rgba(255,255,255,0.09);
-    box-shadow: inset 4px 0 0 var(--tint, var(--border-glow));
+  /* one floor = a lit platform in the tower, laid flat and receding into the distance */
+  .plat {
+    position: absolute; left: -330px; bottom: 0; width: 660px; height: 128px;
+    transform-style: preserve-3d;
+    transform: translate3d(0, calc(var(--i) * -182px), calc(var(--i) * 20px));
+    border-radius: 16px; padding: 12px 16px;
+    background:
+      radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,0.10), transparent 70%),
+      linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.015));
+    border: 1px solid rgba(255,255,255,0.10);
+    box-shadow: 0 0 70px -20px var(--tint), inset 0 0 40px -20px var(--tint);
   }
-  .floorRow.hereNow { border-color: #fff; box-shadow: inset 4px 0 0 var(--tint), 0 0 0 1px #fff, 0 0 18px rgba(255,255,255,0.15); }
-  /* the stairwell linking this chamber to the one above */
-  .floorRow:not(:last-child)::after {
-    content:''; position:absolute; right:26px; bottom:-11px; width:0; height:11px;
-    border-left: 3px dashed var(--border-glow);
+  /* floors already cleared fade behind you */
+  .plat.past { opacity: 0.4; }
+  .plat.hereNow { border-color: rgba(255,255,255,0.55); box-shadow: 0 0 90px -14px var(--tint), inset 0 0 0 1px rgba(255,255,255,0.25); }
+  /* the stairwell from this platform up to the next */
+  .plat:not(.top)::after {
+    content:''; position:absolute; right:34px; top:-42px; width:0; height:42px;
+    border-left: 3px dashed var(--border-glow); opacity: 0.55;
   }
-  .floorRow .frHead { display:flex; align-items:center; gap:7px; margin-bottom:4px; }
-  .floorRow .frNum {
-    display:flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; flex:0 0 auto;
-    font-family:'Cinzel',serif; font-weight:700; font-size:11px; color:#07070f;
-    background: var(--tint, var(--border-glow)); box-shadow: 0 0 8px var(--tint);
+  /* the floor's sign stands up at the back edge so the camera can read it */
+  .plat .frHead {
+    position: absolute; left: 18px; bottom: 100%; margin-bottom: -10px;
+    display: flex; align-items: center; gap: 8px; white-space: nowrap;
+    transform: rotateX(-50deg); transform-origin: bottom left;
   }
-  .floorRow .frIcon {
-    display:inline-flex; align-items:center; justify-content:center; width:26px; height:26px; border-radius:50%; flex:0 0 auto;
-    font-size:15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+  .plat .frNum {
+    display:flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:50%; flex:0 0 auto;
+    font-family:'Cinzel',serif; font-weight:700; font-size:12px; color:#07070f;
+    background: var(--tint, var(--border-glow)); box-shadow: 0 0 12px var(--tint);
   }
-  .floorRow .frName { font-size: 13.5px; font-weight:700; color: var(--text-hi); flex:1; min-width:0; }
-  .floorRow .frDR { font-size: 9.5px; text-transform:uppercase; letter-spacing:0.5px; color: var(--text-dim); flex:0 0 auto; }
+  .plat .frIcon {
+    display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; flex:0 0 auto;
+    font-size:17px; background: rgba(10,12,24,0.75); border: 1px solid rgba(255,255,255,0.18);
+  }
+  .plat .frName { font-family:'Cinzel',serif; font-size: 16px; font-weight:700; color: var(--text-hi); text-shadow: 0 0 12px var(--tint); }
+  .plat .frDR { font-size: 10px; text-transform:uppercase; letter-spacing:0.5px; color: var(--text-mid); }
 
-  /* the path across the chamber: one cell per point of ascension progress */
-  .track { display:flex; align-items:stretch; gap:4px; }
+  /* the path across the platform: one tile per point of ascension progress */
+  .track { display:flex; align-items:stretch; gap:6px; height: 62px; }
   .track .step {
-    flex:1; min-width:0; min-height:28px; border-radius:6px;
-    display:flex; align-items:flex-end; justify-content:center; gap:4px; padding:2px;
-    background: rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.07);
+    flex:1; min-width:0; border-radius:8px;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+    background: rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.09);
   }
-  .track .step.last { border-color: var(--tint); background: rgba(255,255,255,0.07); }
+  .track .step.last { border-color: var(--tint); background: rgba(255,255,255,0.09); }
   .track .gate {
-    flex:0 0 auto; min-width:42px; border-radius:6px; padding:3px 7px;
+    flex:0 0 auto; min-width:60px; border-radius:8px; padding:4px 9px;
     display:flex; flex-direction:column; align-items:center; justify-content:center;
-    border:1px dashed var(--border-glow); color: var(--text-dim);
-    font-size:9px; letter-spacing:0.5px; text-transform:uppercase; line-height:1.3;
+    border:1px dashed var(--border-glow); color: var(--text-mid);
+    font-size:9.5px; letter-spacing:0.5px; text-transform:uppercase; line-height:1.4;
   }
-  .track .gate .gic { font-size:14px; }
-  .track .gate.boss { border-style:solid; border-color: var(--coral); color: var(--coral); }
+  .track .gate .gic { font-size:18px; }
+  .track .gate.boss { border-style:solid; border-color: var(--coral); color: var(--coral); box-shadow: 0 0 20px -6px var(--coral); }
 
+  /* a pawn lies flat on the platform, so stand it back up to face the camera */
+  .stand { transform: rotateX(-50deg); transform-origin: bottom center; }
   /* guild pawn: head, tapered body, and the glow the rest of this UI runs on */
-  .pawn { position:relative; width:17px; height:24px; flex:0 0 auto; filter: drop-shadow(0 0 5px currentColor); }
+  .pawn { position:relative; width:24px; height:34px; flex:0 0 auto; filter: drop-shadow(0 0 5px currentColor); }
   .pawn::before {
-    content:''; position:absolute; top:0; left:50%; margin-left:-5.5px; width:11px; height:11px; border-radius:50%;
+    content:''; position:absolute; top:0; left:50%; margin-left:-7px; width:14px; height:14px; border-radius:50%;
     background: currentColor; box-shadow: inset -2px -2px 0 rgba(0,0,0,0.25);
   }
   .pawn::after {
-    content:''; position:absolute; bottom:0; left:0; width:17px; height:16px; background: currentColor;
+    content:''; position:absolute; bottom:0; left:0; width:22px; height:21px; background: currentColor;
     clip-path: polygon(50% 0, 68% 22%, 78% 60%, 100% 100%, 0 100%, 22% 60%, 32% 22%);
-    box-shadow: inset -3px -3px 0 rgba(0,0,0,0.25);
+    box-shadow: inset -4px -4px 0 rgba(0,0,0,0.25);
   }
   .pawn.turnNow { animation: pawnBob 1.7s ease-in-out infinite; }
-  @keyframes pawnBob { 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-3px); } }
+  @keyframes pawnBob { 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-4px); } }
+  /* a guild arriving on a new floor drops onto the platform */
+  .stand.arriving { animation: pawnArrive 0.6s cubic-bezier(0.3,1.2,0.5,1); }
+  @keyframes pawnArrive {
+    0%   { transform: rotateX(-50deg) translateY(-70px) scale(1.3); opacity: 0; }
+    60%  { opacity: 1; }
+    100% { transform: rotateX(-50deg) translateY(0) scale(1); opacity: 1; }
+  }
 
-  /* what is left of this floor's shared resource pool */
-  .frFoot { display:flex; align-items:center; gap:6px; margin-top:5px; padding-top:5px; border-top: 1px solid rgba(255,255,255,0.06); }
+  /* what is left of this floor's shared resource pool, printed on the platform edge */
+  .frFoot { display:flex; align-items:center; gap:6px; margin-top:8px; }
   .frFoot .frToll { font-size: 9.5px; text-transform:uppercase; letter-spacing:0.5px; color: var(--text-dim); white-space:nowrap; }
-  .frFoot .pips { display:flex; gap:2px; flex:1; }
-  .frFoot .pip { flex:1; height:8px; border-radius:2px; background: rgba(255,255,255,0.08); }
-  .frFoot .pip.filled { background: var(--gold); }
+  .frFoot .pips { display:flex; gap:3px; flex:1; }
+  .frFoot .pip { flex:1; height:6px; border-radius:2px; background: rgba(255,255,255,0.08); }
+  .frFoot .pip.filled { background: var(--gold); box-shadow: 0 0 6px rgba(224,183,86,0.5); }
   .frFoot .poolLabel { font-size: 9.5px; color: var(--text-dim); white-space:nowrap; }
 
-  #diceReveal { display:block; padding: 14px 16px; margin-bottom: 14px; text-align:center; min-height: 92px; }
+  #diceReveal { display:block; padding: 14px 16px; margin-bottom: 14px; text-align:center; }
   #diceReveal .placeholder { font-size: 12.5px; color: var(--text-dim); padding: 20px 0; }
   .diceRow { display:flex; align-items:center; justify-content:center; gap: 10px; margin: 6px 0; }
   /* real dice faces: a 3x3 pip grid, not a printed number */
