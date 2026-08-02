@@ -241,6 +241,14 @@
   .outbreakBadge.warn .obCount { color: #ff5a42; }
   @keyframes pulseWarn { 0%,100%{ box-shadow: 0 0 6px rgba(255,80,60,0.25);} 50%{ box-shadow: 0 0 16px rgba(255,80,60,0.55);} }
   /* one floor of the tower: a chamber you walk across before the gate opens */
+  /* ART SWAP POINTS. everything below is placeholder drawn in CSS. when the real
+     2D art arrives, these are the only four places it goes:
+       .pawn      guild piece      -> background image, drop the ::before/::after shape
+       .frIcon    monster portrait -> background image, drop the emoji
+       .plat      floor surface    -> background image on the platform
+       #world     backdrop         -> background image behind the tower
+     card faces would be new markup in the blacksmith and loot panels. */
+
   /* one floor = a lit platform in the tower, laid flat and receding into the distance */
   .plat {
     position: absolute; left: -330px; bottom: 0; width: 660px; height: 128px;
@@ -280,9 +288,10 @@
   .plat .frDR { font-size: 10px; text-transform:uppercase; letter-spacing:0.5px; color: var(--text-mid); }
 
   /* the path across the platform: one tile per point of ascension progress */
-  .track { display:flex; align-items:stretch; gap:6px; height: 62px; }
+  /* preserve-3d has to survive all the way down or the standing pawns get flattened */
+  .track { display:flex; align-items:stretch; gap:6px; height: 62px; transform-style: preserve-3d; }
   .track .step {
-    flex:1; min-width:0; border-radius:8px;
+    flex:1; min-width:0; border-radius:8px; transform-style: preserve-3d;
     display:flex; align-items:center; justify-content:center; gap:6px;
     background: rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.09);
   }
@@ -296,10 +305,20 @@
   .track .gate .gic { font-size:18px; }
   .track .gate.boss { border-style:solid; border-color: var(--coral); color: var(--coral); box-shadow: 0 0 20px -6px var(--coral); }
 
-  /* a pawn lies flat on the platform, so stand it back up to face the camera */
-  .stand { transform: rotateX(-50deg); transform-origin: bottom center; }
+  /* a piece stands upright on its tile: the tile is flat, the pawn is not.
+     swap the CSS pawn for real art by setting --pawn-art on .pawn to a url(). */
+  .stand {
+    display: block; position: relative; transform-style: preserve-3d;
+    transform: rotateX(-50deg); transform-origin: bottom center;
+  }
+  /* the shadow it casts on the tile stays flat, which is what sells the standing */
+  .stand::after {
+    content:''; position:absolute; left:50%; bottom:-3px; width:20px; height:8px; margin-left:-10px;
+    border-radius:50%; background: rgba(0,0,0,0.55); filter: blur(2px);
+    transform: rotateX(50deg) translateZ(-1px); z-index:-1;
+  }
   /* guild pawn: head, tapered body, and the glow the rest of this UI runs on */
-  .pawn { position:relative; width:24px; height:34px; flex:0 0 auto; filter: drop-shadow(0 0 5px currentColor); }
+  .pawn { display:block; position:relative; width:24px; height:34px; flex:0 0 auto; filter: drop-shadow(0 0 5px currentColor); }
   .pawn::before {
     content:''; position:absolute; top:0; left:50%; margin-left:-7px; width:14px; height:14px; border-radius:50%;
     background: currentColor; box-shadow: inset -2px -2px 0 rgba(0,0,0,0.25);
