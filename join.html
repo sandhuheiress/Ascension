@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ascension: Join a game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<h1 class="title">Ascension: Hunter's Tower</h1>
+<p class="subtitle">Digital prototype &middot; play locally vs AI, or live online with friends</p>
+
+<div id="screenJoin" class="glass card">
+  <h2>Join a game</h2>
+  <p class="desc">Enter the 4-letter room code from your host.</p>
+  <input class="textin" id="joinCodeInput" maxlength="4" placeholder="CODE">
+  <div class="err" id="joinErr"></div>
+  <button class="glow-btn" id="btnFindRoom">Find room</button>
+  <div><button class="ghost-btn" style="margin-top:12px;" id="btnBackFromJoin">Back</button></div>
+</div>
+
+<script type="module" src="js/pages/join.js"></script>
+</body>
+</html>
