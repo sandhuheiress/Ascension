@@ -1,0 +1,1530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ascension: Hunter's Tower</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#07070f;
+    --bg-glow-1: rgba(79,216,255,0.10);
+    --bg-glow-2: rgba(139,92,246,0.16);
+    --panel:#12131f;
+    --panel-2:#181a2c;
+    --border-glow: rgba(90,180,255,0.35);
+    --cyan:#4fd8ff;
+    --violet:#a480ff;
+    --gold:#e0b756;
+    --coral:#ff8b7a;
+    --parchment:#efe3c8;
+    --parchment-ink:#33291b;
+    --text-hi:#eef1ff;
+    --text-mid:#a9adc9;
+    --text-dim:#6d7093;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at 15% 0%, var(--bg-glow-2), transparent 45%),
+      radial-gradient(circle at 85% 15%, var(--bg-glow-1), transparent 40%),
+      var(--bg-deep);
+    background-attachment: fixed;
+    color: var(--text-hi);
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 32px 20px 60px;
+    min-height: 100vh;
+  }
+  body.in-game {
+    max-width: 1180px;
+    height: 100vh;
+    min-height: 0;
+    padding: 12px 18px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  body.in-game h1.title, body.in-game p.subtitle { display: none; }
+  h1.title {
+    font-family: 'Cinzel', serif;
+    font-weight: 700;
+    font-size: 28px;
+    letter-spacing: 1px;
+    margin: 0 0 2px;
+    text-align: center;
+    color: var(--text-hi);
+    text-shadow: 0 0 18px rgba(90,180,255,0.55), 0 0 40px rgba(139,92,246,0.25);
+  }
+  p.subtitle {
+    text-align: center;
+    color: var(--text-mid);
+    font-size: 13px;
+    margin: 0 0 22px;
+    letter-spacing: 0.5px;
+  }
+  .glass {
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    border: 1px solid var(--border-glow);
+    border-radius: 10px;
+    box-shadow: 0 0 24px rgba(79,216,255,0.06), inset 0 1px 0 rgba(255,255,255,0.03);
+  }
+  .card { max-width: 480px; margin: 0 auto 40px; padding: 28px 26px; text-align: center; }
+  .card h2 { font-family:'Cinzel',serif; font-size: 17px; margin: 0 0 4px; color: var(--cyan); text-shadow: 0 0 10px rgba(79,216,255,0.5); }
+  .card p.desc { font-size: 13px; color: var(--text-mid); margin: 0 0 18px; }
+  .modeToggle { display:flex; justify-content:center; gap:8px; margin: 0 auto 20px; max-width: 480px; }
+  .modeBtn {
+    flex:1; font-family:'Cinzel',serif; font-weight:600; font-size: 13px; padding: 10px 12px;
+    border-radius: 8px; border: 1px solid var(--border-glow); background: var(--panel); color: var(--text-mid); cursor: pointer;
+  }
+  .modeBtn.sel { background: radial-gradient(circle, rgba(79,216,255,0.25), rgba(79,216,255,0.05)); border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 14px rgba(79,216,255,0.35); }
+  .count-row { display: flex; justify-content: center; gap: 10px; margin-bottom: 18px; }
+  .count-btn {
+    width: 54px; height: 54px; border-radius: 50%;
+    background: var(--panel); border: 1px solid var(--border-glow); color: var(--text-hi);
+    font-size: 18px; font-weight: 600; cursor: pointer; font-family: 'Cinzel', serif;
+  }
+  .count-btn.sel { background: radial-gradient(circle, rgba(79,216,255,0.25), rgba(79,216,255,0.05)); border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 16px rgba(79,216,255,0.4); }
+  .glow-btn {
+    font-family: 'Cinzel', serif; font-weight: 600; letter-spacing: 0.5px;
+    background: linear-gradient(180deg, rgba(79,216,255,0.22), rgba(139,92,246,0.18));
+    border: 1px solid var(--cyan); color: var(--text-hi);
+    padding: 12px 26px; border-radius: 8px; font-size: 14px; cursor: pointer;
+    box-shadow: 0 0 18px rgba(79,216,255,0.25);
+  }
+  .glow-btn:hover { box-shadow: 0 0 26px rgba(79,216,255,0.45); }
+  .glow-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+  .ghost-btn {
+    font-family: 'Inter', sans-serif; background: transparent; border: 1px solid var(--border-glow);
+    color: var(--text-mid); padding: 10px 18px; border-radius: 8px; font-size: 13px; cursor: pointer;
+  }
+  .textin {
+    background: var(--panel); border: 1px solid var(--border-glow); color: var(--text-hi);
+    border-radius: 8px; padding: 10px 14px; font-size: 16px; text-align: center; letter-spacing: 3px;
+    text-transform: uppercase; width: 160px; margin: 0 auto 16px; display: block; font-family: 'Cinzel', serif;
+  }
+  .codeShow { font-family:'Cinzel',serif; font-size: 26px; letter-spacing: 4px; color: var(--cyan); text-shadow: 0 0 12px rgba(79,216,255,0.5); margin: 4px 0 18px; }
+  .slotRow { display:flex; flex-direction:column; gap:8px; margin-bottom: 18px; }
+  .slotBtn {
+    display:flex; align-items:center; justify-content:space-between;
+    background: var(--panel); border: 1px solid var(--border-glow); border-radius: 8px;
+    padding: 10px 14px; font-size: 13px; cursor: pointer; color: var(--text-hi);
+  }
+  .slotBtn .dotc { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:8px; }
+  .slotBtn[disabled] { opacity: 0.45; cursor: not-allowed; }
+  .slotBtn .tag { font-size: 11px; color: var(--text-dim); }
+  .slotBtn .tag.bot { color: var(--violet); }
+  .err { color: var(--coral); font-size: 12.5px; margin: -8px 0 14px; min-height: 14px; }
+  .btnRow { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top: 12px; }
+
+  .colorGrid { display:grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+  .colorOpt {
+    border-radius: 10px; padding: 16px 10px; text-align:center; cursor:pointer;
+    border: 1px solid var(--border-glow); background: var(--panel); color: var(--text-mid);
+  }
+  .colorOpt .ic { font-size: 22px; display:block; margin-bottom: 6px; }
+  .colorOpt .nm { font-family:'Cinzel',serif; font-weight:600; font-size: 13px; }
+  .colorOpt.sel { border-color: #fff; box-shadow: 0 0 0 1px #fff, 0 0 16px currentColor; }
+
+  #game { display: none; }
+  .gameHead { display:flex; align-items:center; justify-content:space-between; margin-bottom: 12px; }
+  .gameHead .roomTag { font-size: 11.5px; color: var(--text-dim); }
+  .gameHead .roomTag b { color: var(--cyan); font-family:'Cinzel',serif; letter-spacing:2px; }
+  .leaveBtn { background:transparent; border:1px solid var(--border-glow); color: var(--text-mid); font-size:11.5px; padding:6px 12px; border-radius:6px; cursor:pointer; }
+  .leaveBtn:hover { border-color: var(--coral); color: var(--coral); }
+
+  .turnBanner {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 18px; margin-bottom: 14px; font-size: 14px; font-weight: 600;
+  }
+  .turnBanner .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 0 8px currentColor; }
+  .turnBanner .hint { font-weight: 400; color: var(--text-mid); font-size: 12px; }
+
+  .floorCard {
+    background: linear-gradient(180deg, var(--parchment), #e6d8b5);
+    color: var(--parchment-ink);
+    border: 1px solid #b8a473;
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  }
+  .floorCard h2 { font-family: 'Cinzel', serif; font-size: 16px; margin: 0 0 4px; }
+  .floorCard p { font-size: 12.5px; margin: 0; opacity: 0.85; }
+
+  .arena {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .guildPanel { padding: 12px 14px; border-left: 3px solid var(--border-glow); }
+  .guildPanel h3 { font-family: 'Cinzel', serif; font-size: 13.5px; margin: 0 0 8px; display:flex; align-items:center; gap:6px; }
+  .guildPanel .miniStats { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; margin-bottom: 8px; }
+  .guildPanel .miniStat { background: rgba(255,255,255,0.03); border-radius: 6px; padding: 6px 8px; }
+  .guildPanel .miniStat .l { font-size: 10px; color: var(--text-dim); }
+  .guildPanel .miniStat .v { font-size: 14px; font-weight: 600; color: var(--text-hi); }
+  .guildPanel p.line { font-size: 11.5px; color: var(--text-mid); margin: 3px 0; }
+  .curseTag { color: var(--coral); font-size: 10.5px; }
+  .youTag { color: var(--gold); font-size: 10.5px; }
+  .botTag { color: var(--violet); font-size: 10.5px; }
+
+  .rivalRow { display: flex; flex-wrap: wrap; gap: 8px; }
+  .rivalChip {
+    display: flex; align-items: center; gap: 6px; flex: 1 1 auto;
+    background: var(--panel); border: 1px solid var(--border-glow); border-radius: 8px;
+    padding: 7px 11px; font-size: 11.5px; color: var(--text-mid);
+  }
+  .rivalChip .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: 0 0 auto; }
+  .rivalChip .rname { color: var(--text-hi); font-weight: 600; }
+  .rivalChip .rap { color: var(--text-dim); margin-left: auto; }
+
+  .layout { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+  .logPanel { padding: 18px 16px; }
+  .logPanel h3 { font-family:'Cinzel',serif; font-size: 13px; text-align:center; margin: 0 0 12px; color: var(--text-hi); letter-spacing: 1px; text-transform: uppercase; }
+
+  body.in-game #game { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+  body.in-game .gameHead { flex: 0 0 auto; margin-bottom: 8px; }
+  body.in-game .layout {
+    flex: 1; min-height: 0; align-items: stretch;
+    grid-template-columns: 260px 1fr 240px;
+  }
+  @media (max-width: 1100px) { body.in-game .layout { grid-template-columns: 220px 1fr 200px; } }
+  @media (max-width: 900px) { body.in-game .layout { grid-template-columns: 1fr; } body.in-game .mainCol, body.in-game .towerPanel, body.in-game .logPanel { max-height: none; } }
+  body.in-game .towerPanel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  body.in-game .towerPanel #towerList { flex: 1; min-height: 0; overflow-y: auto; padding-right: 6px; }
+  body.in-game .mainCol { min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+  body.in-game .logPanel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  body.in-game .logPanel #log { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }
+  body.in-game .towerPanel { padding: 16px 16px; }
+  body.in-game .towerPanel h3 { margin-bottom: 10px; }
+  body.in-game .turnBanner, body.in-game .floorCard, body.in-game .arena,
+  body.in-game .placemat, body.in-game .ascendRow, body.in-game #diceReveal { margin-bottom: 8px; }
+  body.in-game .actionBar { margin-bottom: 8px; }
+  body.in-game button.act.end { margin-bottom: 8px; }
+  /* while a trade/sabotage/blacksmith panel is open, hide the action grid to make room and avoid clipping */
+  body.in-game .mainCol:has(.panelInline.show) .actionBar,
+  body.in-game .mainCol:has(.panelInline.show) .ascendRow,
+  body.in-game .mainCol:has(.panelInline.show) button.act.end,
+  body.in-game .mainCol:has(.panelInline.show) .placemat { display: none; }
+
+  .towerPanel { padding: 20px 18px; }
+  .towerPanel h3 { font-family:'Cinzel',serif; font-size: 15px; text-align:center; margin: 0 0 16px; color: var(--text-hi); letter-spacing: 1px; }
+  .outbreakBadge {
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    padding: 10px 12px; margin-bottom: 16px; border-radius: 10px;
+    background: rgba(255,139,122,0.08); border: 1px solid rgba(255,139,122,0.35);
+  }
+  .outbreakBadge .obLabel { font-size: 10.5px; text-transform:uppercase; letter-spacing:0.5px; color: var(--text-mid); line-height:1.4; }
+  .outbreakBadge .obLabel b { display:block; color: var(--coral); font-family:'Cinzel',serif; font-size: 11.5px; letter-spacing:0.5px; }
+  .outbreakBadge .obCount { font-family:'Cinzel',serif; font-size: 26px; font-weight:700; color: var(--coral); text-shadow: 0 0 10px rgba(255,139,122,0.5); min-width: 34px; text-align:center; }
+  .outbreakBadge.warn { background: rgba(255,80,60,0.16); border-color: #ff5a42; animation: pulseWarn 1.1s ease-in-out infinite; }
+  .outbreakBadge.warn .obCount { color: #ff5a42; }
+  @keyframes pulseWarn { 0%,100%{ box-shadow: 0 0 6px rgba(255,80,60,0.25);} 50%{ box-shadow: 0 0 16px rgba(255,80,60,0.55);} }
+  .floorRow { border-radius: 12px; padding: 13px 14px; margin-bottom: 12px; border: 1px solid rgba(255,255,255,0.09); position: relative; }
+  .floorRow.hereNow { border-color: #fff; box-shadow: 0 0 0 1px #fff, 0 0 18px rgba(255,255,255,0.15); }
+  .floorRow:not(:last-child)::after {
+    content:''; position:absolute; left:50%; bottom:-13px; width:2px; height:12px;
+    background: var(--border-glow); transform: translateX(-50%);
+  }
+  .floorRow .frTop { display:flex; justify-content:space-between; align-items:center; font-size: 10.5px; color: var(--text-dim); margin-bottom: 6px; text-transform:uppercase; letter-spacing:0.5px; }
+  .floorRow .frName { font-size: 15px; font-weight:700; color: var(--text-hi); margin: 0 0 4px; gap:8px; }
+  .floorRow .frName .frIcon { font-size: 24px; }
+  .floorRow .frMeta { font-size: 10.5px; color: var(--text-mid); margin-bottom: 8px; }
+  .floorRow .frMarkers { display:flex; flex-wrap:wrap; gap:5px; margin-bottom: 6px; }
+  .floorRow .frMarker { width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:700; color:#07070f; box-shadow: 0 0 6px currentColor; }
+  .pipTrack { display:flex; align-items:center; gap:6px; margin-top:5px; }
+  .pipTrack .pips { display:flex; flex-wrap:wrap; gap:3px; }
+  .pipTrack .pip { width:11px; height:11px; border-radius:3px; background: rgba(255,255,255,0.08); }
+  .pipTrack .pip.filled { box-shadow: 0 0 5px currentColor; }
+  .pipTrack .pipLabel { font-size: 9.5px; color: var(--text-dim); white-space:nowrap; margin-left:2px; }
+  .poolTrack { display:flex; align-items:center; gap:6px; margin-top:10px; padding-top:8px; border-top: 1px solid rgba(255,255,255,0.06); }
+  .poolTrack .pips { display:flex; gap:2px; flex:1; }
+  .poolTrack .pip { flex:1; height:8px; border-radius:2px; background: rgba(255,255,255,0.08); }
+  .poolTrack .pip.filled { background: var(--gold); }
+  .poolTrack .poolLabel { font-size: 9.5px; color: var(--text-dim); white-space:nowrap; }
+
+  #diceReveal { display:block; padding: 14px 16px; margin-bottom: 14px; text-align:center; min-height: 92px; }
+  #diceReveal .placeholder { font-size: 12.5px; color: var(--text-dim); padding: 20px 0; }
+  .diceRow { display:flex; align-items:center; justify-content:center; gap: 10px; margin: 6px 0; }
+  .diceCube {
+    width: 44px; height: 44px; border-radius: 8px; background: #f4f0e6; color: #1c1c1a;
+    display:flex; align-items:center; justify-content:center; font-size: 20px; font-weight:700;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+  }
+  .diceRow .plus { color: var(--text-mid); font-size: 16px; }
+  .diceCube.idle { background: #3a3d52; color: var(--text-dim); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+  @keyframes dicePop { 0%{ transform: scale(0.4) rotate(-8deg); opacity:0; } 60%{ transform: scale(1.08) rotate(3deg); opacity:1; } 100%{ transform: scale(1) rotate(0); } }
+  .diceCube.pop { animation: dicePop 0.35s ease-out; }
+  #diceReveal .resultLine { font-size: 13.5px; font-weight:600; margin-top: 6px; }
+  #diceReveal .resultLine.success { color: #7fe0a8; }
+  #diceReveal .resultLine.fail { color: var(--coral); }
+  #diceReveal .resultLine.crit { color: var(--gold); }
+
+  .actionBar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .actionBar button.act { flex: 1 1 calc(25% - 6px); min-width: 118px; }
+  @media (max-width: 560px) { .actionBar button.act { flex: 1 1 calc(50% - 4px); } }
+  button.act {
+    background: var(--panel); color: var(--text-hi);
+    border: 1px solid var(--border-glow); border-radius: 9px;
+    padding: 10px 10px; font-size: 12.5px; cursor: pointer; font-family: 'Inter', sans-serif;
+    display:flex; flex-direction:column; align-items:center; text-align:center; gap:3px;
+  }
+  button.act .lbl { font-size: 12.5px; font-weight:600; }
+  button.act .sub { font-size: 9.5px; color: var(--text-dim); line-height:1.3; }
+  button.act:hover { border-color: var(--cyan); box-shadow: 0 0 12px rgba(79,216,255,0.3); }
+  button.act:disabled { opacity: 0.35; cursor: not-allowed; }
+  button.act.raid { border-color: rgba(255,139,122,0.5); }
+  button.act.raid:hover { border-color: var(--coral); box-shadow: 0 0 12px rgba(255,139,122,0.3); }
+  button.act.trade { border-color: rgba(164,128,255,0.5); }
+  button.act.trade:hover { border-color: var(--violet); box-shadow: 0 0 12px rgba(164,128,255,0.3); }
+  button.act.end { border-color: var(--cyan); background: rgba(79,216,255,0.08); width:100%; flex-direction:row; justify-content:center; padding:12px; margin-bottom:12px; }
+
+  .ascendRow { margin-bottom: 10px; }
+  button.act.ascend {
+    width: 100%; flex-direction: row; justify-content: center; gap: 12px;
+    padding: 15px 16px; border: 1px solid var(--gold);
+    background: linear-gradient(135deg, rgba(224,183,86,0.18), rgba(224,183,86,0.05));
+    box-shadow: 0 0 16px rgba(224,183,86,0.18);
+  }
+  button.act.ascend .lbl { font-family:'Cinzel',serif; font-size: 15px; letter-spacing: 0.5px; color: var(--gold); }
+  button.act.ascend .sub { font-size: 10.5px; }
+  button.act.ascend:hover { box-shadow: 0 0 22px rgba(224,183,86,0.4); }
+  button.act.ascend:disabled { box-shadow:none; }
+
+  .placemat {
+    display: none; margin-bottom: 14px; padding: 20px 22px; border-radius: 16px;
+    background: linear-gradient(160deg, rgba(224,183,86,0.1), rgba(18,19,31,0.92));
+    border: 1px solid rgba(224,183,86,0.32);
+  }
+  .placemat.show { display: block; }
+  .placemat h4 {
+    font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--gold); margin: 0 0 16px; text-align: center;
+  }
+  .placematCols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .placematCol { min-width: 0; }
+  .placematCol.gearCol { border-left: 1px solid rgba(255,255,255,0.1); padding-left: 18px; }
+  @media (max-width: 640px) {
+    .placematCols { grid-template-columns: 1fr; }
+    .placematCol.gearCol { border-left: none; padding-left: 0; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 12px; margin-top: 4px; }
+  }
+  .pmLabel {
+    font-family: 'Cinzel', serif; font-size: 10.5px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--text-dim); margin-bottom: 10px; text-align: center;
+  }
+  .matRow { display: flex; flex-wrap: wrap; gap: 7px; justify-content: center; align-items: center; min-height: 28px; }
+  .matChip {
+    display: flex; align-items: center; gap: 5px; background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.14); border-radius: 18px; padding: 5px 12px; font-size: 12.5px;
+  }
+  .matChip .ic { font-size: 15px; }
+  .matChip .qty { font-weight: 700; color: var(--text-hi); }
+  .matChip.empty { opacity: 0.55; font-style: italic; }
+  .matChip.gear { border-color: rgba(79,216,255,0.45); }
+
+  select {
+    background: var(--panel); color: var(--text-hi); border: 1px solid var(--border-glow);
+    border-radius: 6px; padding: 7px 9px; font-size: 12.5px; font-family: 'Inter', sans-serif;
+  }
+  .panelInline { padding: 12px 14px; margin-bottom: 12px; display: none; }
+  .panelInline.show { display: block; }
+  .panelInline label { font-size: 11.5px; color: var(--text-mid); display:block; margin-bottom:4px; }
+  .panelInline .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin-bottom: 8px; }
+  .panelInline .field { display: flex; flex-direction: column; }
+  .panelInline .submitRow { display:flex; gap:8px; }
+
+  #tradeOfferBanner { display:none; padding: 12px 16px; margin-bottom: 14px; border-color: var(--violet); }
+  #tradeOfferBanner.show { display:block; }
+  #tradeOfferBanner .submitRow { display:flex; gap:8px; margin-top:8px; }
+
+  #log {
+    padding: 12px 14px; font-size: 12.5px; color: var(--text-mid); min-height: 100px; line-height: 1.6;
+  }
+  #log div { margin-bottom: 5px; border-left: 2px solid var(--border-glow); padding-left: 8px; }
+  #log div.ev { border-left-color: var(--violet); color: var(--text-hi); }
+  #log div.st { border-left-color: var(--coral); }
+  #log div.wn { border-left-color: var(--gold); color: var(--gold); font-weight:600; }
+
+
+  .howBtn { background:transparent; border:1px solid var(--border-glow); color: var(--text-mid); font-size:11.5px; padding:6px 12px; border-radius:6px; cursor:pointer; }
+  .howBtn:hover { border-color: var(--cyan); color: var(--cyan); }
+  .modalOverlay { position:fixed; inset:0; background:rgba(4,4,10,0.72); display:none; align-items:center; justify-content:center; z-index:80; padding:20px; }
+  .modalOverlay.show { display:flex; }
+  .modalCard { max-width: 560px; width:100%; max-height: 84vh; overflow-y:auto; padding: 26px 28px; }
+  .modalCard h2 { font-family:'Cinzel',serif; font-size: 19px; margin: 0 0 16px; color: var(--text-hi); text-align:center; }
+  .howRow { display:flex; gap:12px; margin-bottom: 14px; align-items:flex-start; }
+  .howRow .hic { font-size: 18px; line-height:1.4; }
+  .howRow .htxt { font-size: 13px; color: var(--text-mid); line-height:1.5; }
+  .howRow .htxt b { color: var(--text-hi); }
+  .tcostTable { display: grid; gap: 3px; margin-top: 8px; font-size: 11.5px; color: var(--text-dim); }
+  .tcostTable div { display: flex; justify-content: space-between; gap: 10px; }
+  .tcostTable b { color: var(--text-mid); font-weight: 600; }
+  .modalCloseRow { text-align:center; margin-top: 8px; }
+
+  .avatarRow { display:flex; gap:6px; }
+  .avatarChip { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10.5px; font-weight:700; color:#07070f; border:2px solid transparent; }
+  .avatarChip.turn { border-color:#fff; }
+
+  .towerPanel h3 .cic { margin-right:4px; }
+  .floorRow .frName { display:flex; align-items:center; gap:5px; }
+</style>
+</head>
+<body>
+
+<h1 class="title">Ascension: Hunter's Tower</h1>
+<p class="subtitle">Digital prototype &middot; play locally vs AI, or live online with friends</p>
+
+<div id="screenHome" style="max-width:480px;margin:0 auto;">
+  <div style="text-align:center;margin-bottom:14px;">
+    <button class="howBtn" id="btnHowToHome">How to play</button>
+  </div>
+  <div class="modeToggle">
+    <button class="modeBtn sel" id="modeLocalBtn">Local game</button>
+    <button class="modeBtn" id="modeOnlineBtn">Online room</button>
+  </div>
+
+  <div id="homeLocalPanel" class="glass card">
+    <h2>Play vs AI</h2>
+    <p class="desc">Solo test the game functions against computer-controlled guilds, all on this device.</p>
+    <div class="count-row" id="localCountRow"></div>
+    <button class="glow-btn" id="btnLocalNext">Next</button>
+  </div>
+
+  <div id="homeOnlinePanel" class="glass card" style="display:none;">
+    <h2>Play online</h2>
+    <p class="desc">Host a new expedition, or join one already in progress with a room code.</p>
+    <div class="btnRow">
+      <button class="glow-btn" id="btnGoCreate">Host a new game</button>
+      <button class="ghost-btn" id="btnGoJoin">Join a game</button>
+    </div>
+  </div>
+</div>
+
+<div id="screenCreate" class="glass card" style="display:none;">
+  <h2>Party size</h2>
+  <p class="desc">How many guild seats will this room have? You can fill empty seats with AI once the room is open.</p>
+  <div class="count-row" id="countRow"></div>
+  <div class="err" id="createErr"></div>
+  <button class="glow-btn" id="btnCreateNext">Next</button>
+  <div><button class="ghost-btn" style="margin-top:12px;" id="btnBackFromCreate">Back</button></div>
+</div>
+
+<div id="screenIdentity" class="glass card" style="display:none;">
+  <h2>Name your guild</h2>
+  <p class="desc">Pick a name and a color for your guild.</p>
+  <input class="textin" id="identityName" style="width:220px;" maxlength="18" placeholder="Guild name">
+  <div class="colorGrid" id="colorGrid"></div>
+  <div class="err" id="identityErr"></div>
+  <div class="btnRow">
+    <button class="ghost-btn" id="btnBackFromIdentity">Back</button>
+    <button class="glow-btn" id="btnIdentityGo">Next</button>
+  </div>
+</div>
+
+<div id="screenJoin" class="glass card" style="display:none;">
+  <h2>Join a game</h2>
+  <p class="desc">Enter the 4-letter room code from your host.</p>
+  <input class="textin" id="joinCodeInput" maxlength="4" placeholder="CODE">
+  <div class="err" id="joinErr"></div>
+  <button class="glow-btn" id="btnFindRoom">Find room</button>
+  <div><button class="ghost-btn" style="margin-top:12px;" id="btnBackFromJoin">Back</button></div>
+</div>
+
+<div id="screenSlots" class="glass card" style="display:none;">
+  <h2>Choose your guild</h2>
+  <p class="desc">Pick an open slot to claim it on this device.</p>
+  <div class="slotRow" id="slotRow"></div>
+  <button class="ghost-btn" id="btnBackFromSlots">Back</button>
+</div>
+
+<div id="screenLobby" class="glass card" style="display:none;">
+  <h2>Waiting room</h2>
+  <p class="desc">Room code, share this with the rest of the party.</p>
+  <div class="codeShow" id="lobbyCode"></div>
+  <div class="slotRow" id="lobbySlots"></div>
+  <div class="btnRow">
+    <button class="ghost-btn" id="btnAddBot">Fill a seat with AI</button>
+  </div>
+  <button class="glow-btn" style="margin-top:14px;" id="btnStartGame">Start game</button>
+  <p class="desc" style="margin-top:10px;font-size:11.5px;" id="lobbyHint"></p>
+  <div><button class="ghost-btn" style="margin-top:6px;" id="btnLeaveLobby">Leave room</button></div>
+</div>
+
+<div id="game">
+  <div class="gameHead">
+    <span class="roomTag" id="roomTag"></span>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="avatarRow" id="headerAvatars"></div>
+      <button class="howBtn" id="btnHowToGame">How to play</button>
+      <button class="leaveBtn" id="btnLeaveGame">Leave game</button>
+    </div>
+  </div>
+
+  <div class="layout">
+    <div class="towerPanel glass">
+      <h3>The Tower</h3>
+      <div id="outbreakBadge" class="outbreakBadge"></div>
+      <div id="towerList"></div>
+    </div>
+
+    <div class="mainCol">
+      <div class="turnBanner glass" id="turnBanner"></div>
+      <div id="winBanner" class="glass" style="display:none; padding:12px 18px; margin-bottom:14px; color:var(--gold); font-weight:600;"></div>
+      <div id="tradeOfferBanner" class="glass"></div>
+      <div id="diceReveal" class="glass"></div>
+
+      <div class="floorCard">
+        <h2 id="floorTitle"></h2>
+        <p id="floorSub"></p>
+      </div>
+
+      <div class="arena" id="arena"></div>
+
+      <div id="myPlacemat" class="placemat glass">
+        <h4>Your Supplies</h4>
+        <div class="placematCols">
+          <div class="placematCol">
+            <div class="pmLabel">Materials</div>
+            <div class="matRow" id="placematMats"></div>
+          </div>
+          <div class="placematCol gearCol">
+            <div class="pmLabel">Gear</div>
+            <div class="matRow" id="placematGear"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="actionBar">
+        <button class="act" id="btnHunt"><span class="lbl">Hunt</span><span class="sub" id="huntSub">1 AP</span></button>
+        <button class="act" id="btnTrain"><span class="lbl">Train</span><span class="sub" id="trainSub">1 AP</span></button>
+        <button class="act raid" id="btnRaid"><span class="lbl">Raid</span><span class="sub">1 AP, d6 4+ steals</span></button>
+        <button class="act trade" id="btnTradeToggle"><span class="lbl">Trade</span><span class="sub">Propose a swap</span></button>
+        <button class="act raid" id="btnSabotageToggle"><span class="lbl">Sabotage</span><span class="sub">1 AP, curse a rival</span></button>
+        <button class="act" id="btnBlacksmithToggle"><span class="lbl">Blacksmith</span><span class="sub">Craft or upgrade gear</span></button>
+        <button class="act" id="btnTransmute"><span class="lbl">Transmute</span><span class="sub" id="transmuteSub">give &rarr; receive 1</span></button>
+      </div>
+
+      <div class="ascendRow">
+        <button class="act ascend" id="btnAscend"><span class="lbl">&#x2B06;&#xFE0F; Ascend</span><span class="sub" id="ascendSub">pay the toll</span></button>
+      </div>
+
+      <button class="act end" id="btnEndTurn"><span class="lbl">End turn</span></button>
+
+      <div class="panelInline glass" id="tradePanel">
+        <div class="row">
+          <div class="field"><label>Target</label><select id="tradeTarget"></select></div>
+          <div class="field"><label>You give</label><select id="tradeGiveMat"></select></div>
+          <div class="field"><label>Qty</label><select id="tradeGiveQty"></select></div>
+          <div class="field"><label>You want</label><select id="tradeWantMat"></select></div>
+          <div class="field"><label>Qty</label><select id="tradeWantQty"></select></div>
+        </div>
+        <div class="submitRow">
+          <button class="act trade" id="btnSendTrade">Send offer</button>
+          <button class="act" id="btnCancelTrade">Cancel</button>
+        </div>
+      </div>
+
+      <div class="panelInline glass" id="sabotagePanel">
+        <div class="row">
+          <div class="field"><label>Target</label><select id="sabTarget"></select></div>
+          <div class="field"><label>Pay with</label><select id="sabMat"></select></div>
+        </div>
+        <div class="submitRow">
+          <button class="act raid" id="btnSendSabotage">Cast curse</button>
+          <button class="act" id="btnCancelSabotage">Cancel</button>
+        </div>
+      </div>
+
+      <div class="panelInline glass" id="blacksmithPanel">
+        <div class="row">
+          <div class="field" style="flex:1 1 100%;"><label>Craft or upgrade</label><select id="blacksmithItem"></select></div>
+        </div>
+        <p class="line" id="blacksmithCost" style="font-size:11.5px;color:var(--text-mid);margin:6px 0 0;"></p>
+        <div class="submitRow">
+          <button class="act" id="btnCraftItem">Craft</button>
+          <button class="act" id="btnCancelBlacksmith">Cancel</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="logPanel glass">
+      <h3>Activity Log</h3>
+      <div id="log"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modalOverlay" id="howToOverlay">
+  <div class="modalCard glass">
+    <h2>How to play</h2>
+    <div class="howRow"><span class="hic">&#x1F3AF;</span><span class="htxt"><b>Objective:</b> race to Floor 6 and defeat the Sovereign, or hold the strongest position when your friends call the game.</span></div>
+    <div class="howRow"><span class="hic">&#x2694;&#xFE0F;</span><span class="htxt"><b>Turn actions (2 AP):</b> Hunt, Train, Raid, and Sabotage each cost 1 action point. Trade, Craft, Transmute, and Ascend are free.</span></div>
+    <div class="howRow"><span class="hic">&#x1F3B2;</span><span class="htxt"><b>Hunt:</b> roll 2d6 vs the floor's DR. Success grants progress and usually a material. Snake eyes (1+1) lets you steal from a rival instead of losing progress. Double sixes crit for +2 progress and a free action.</span></div>
+    <div class="howRow"><span class="hic">&#x1F4DA;</span><span class="htxt"><b>Train:</b> spend 2 of the current floor's material for a guaranteed +1 progress, no roll.</span></div>
+    <div class="howRow"><span class="hic">&#x1F5E1;&#xFE0F;</span><span class="htxt"><b>Raid:</b> roll a d6, 4 or higher steals 1 random material from a rival.</span></div>
+    <div class="howRow"><span class="hic">&#x1F91D;</span><span class="htxt"><b>Trade:</b> propose a material swap with any guild. They accept or decline on their own device (AI guilds respond automatically).</span></div>
+    <div class="howRow"><span class="hic">&#x1FA84;</span><span class="htxt"><b>Sabotage:</b> spend 1 material to curse a rival, their next Hunt total takes -2.</span></div>
+    <div class="howRow"><span class="hic">&#x1F3F9;</span><span class="htxt"><b>Blacksmith:</b> craft Basic Bow (2 Kasaka Fang, reroll a die) or Basic Sword (2 Golem Crystal, +2 total), upgrade them, or craft accessories: Shield (blocks a snake-eyes penalty), Lucky Coin (+1 loot on success), Compass (+1 progress on success). 2 item slots, only 1 accessory at a time.</span></div>
+    <div class="howRow"><span class="hic">&#x2728;</span><span class="htxt"><b>Transmute:</b> spend the floor's listed cost in any combination of materials to receive 1 of that floor's material.
+      <div class="tcostTable" id="tcostTable"></div>
+    </span></div>
+    <div class="howRow"><span class="hic">&#x1FA9C;</span><span class="htxt"><b>Ascend:</b> once you meet the progress requirement and hold the toll material, move up to the next floor.</span></div>
+    <div class="howRow"><span class="hic">&#x1F480;</span><span class="htxt"><b>Monster Outbreak:</b> the lowest floor nobody has cleared yet carries a countdown, shown above the Tower panel. It resets when that floor is finally cleared. If it hits 0, the guild furthest ahead loses 2 progress and everyone else loses 1.</span></div>
+    <div class="howRow"><span class="hic">&#x1F4A5;</span><span class="htxt"><b>Camping:</b> stay on the same floor past 3 of your own turns and the Monster attacks, -1 progress and -1 material.</span></div>
+    <div class="howRow"><span class="hic">&#x1F340;</span><span class="htxt"><b>Tower Events:</b> roughly 1 in 3 turns draws a random event, good or bad, when your turn begins.</span></div>
+    <div class="howRow"><span class="hic">&#x1F4C8;</span><span class="htxt"><b>Catch-up:</b> whoever is on the lowest floor gets +1 added to their Hunt rolls.</span></div>
+    <div class="modalCloseRow"><button class="glow-btn" id="btnCloseHowTo">Got it</button></div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase, ref, onValue, off, set, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCETNzuvNn0-f5CsJhR_okTIgyJMC-dEPQ",
+  authDomain: "ascension-e83bb.firebaseapp.com",
+  databaseURL: "https://ascension-e83bb-default-rtdb.firebaseio.com",
+  projectId: "ascension-e83bb",
+  storageBucket: "ascension-e83bb.firebasestorage.app",
+  messagingSenderId: "269995200895",
+  appId: "1:269995200895:web:3780fadb27fb1810944a4a",
+  measurementId: "G-94ER7T1W8W"
+};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+const floors=[
+  {name:"Kasaka Fang", dr:6, need:2, toll:1, tcost:4},
+  {name:"Golem Crystal", dr:7, need:3, toll:2, tcost:4},
+  {name:"Orc Tusk", dr:8, need:4, toll:2, tcost:3},
+  {name:"Oracle Wisp", dr:9, need:5, toll:3, tcost:3},
+  {name:"Kaisel Scale", dr:10, need:6, toll:3, tcost:2},
+  {name:"Sovereign's Ash", dr:11, need:7, toll:0, tcost:2}
+];
+document.getElementById('tcostTable').innerHTML = floors.map(function(f,i){
+  return '<div><span>Floor '+(i+1)+', '+f.name+'</span><b>'+f.tcost+' given &rarr; receive 1</b></div>';
+}).join('');
+
+const CAP=3, CAMP_LIMIT=3, START_POOL=10;
+const PALETTE=['#4fd8ff','#a480ff','#e0b756','#ff8b7a'];
+const FLOOR_TINT=['#4fd8ff','#5de0c8','#a480ff','#d97fe0','#e0b756','#ff8b7a'];
+const FLOOR_ICON=['\u{1F40D}','\u{1F5FF}','\u{1F479}','\u{1F441}\u{FE0F}','\u{1F48E}','\u{1F409}'];
+const COLOR_OPTIONS=[
+  {color:'#4fd8ff', name:'Azure', icon:'\u{1F30A}'},
+  {color:'#a480ff', name:'Amethyst', icon:'\u{1F52E}'},
+  {color:'#e0b756', name:'Amber', icon:'\u{1F3C6}'},
+  {color:'#ff8b7a', name:'Ember', icon:'\u{1F525}'}
+];
+const GEAR={
+  'Basic Bow':      { type:'weapon', line:'bow',   tier:1, cost:{'Kasaka Fang':2}, desc:'Reroll one die once, must accept the new sum.' },
+  'Upgraded Bow':   { type:'weapon', line:'bow',   tier:2, cost:{'Golem Crystal':2}, requires:'Basic Bow', desc:'Reroll one die once, add the new value on top of the original total.' },
+  'Basic Sword':    { type:'weapon', line:'sword', tier:1, cost:{'Golem Crystal':2}, desc:'+2 to the final roll total.' },
+  'Upgraded Sword': { type:'weapon', line:'sword', tier:2, cost:{'Orc Tusk':3}, requires:'Basic Sword', desc:'+4 to the final roll total.' },
+  'Shield':         { type:'accessory', cost:{'Kasaka Fang':2,'Golem Crystal':1}, desc:'Prevents progress loss when a snake-eyes hunt finds no rival to steal from.' },
+  'Lucky Coin':     { type:'accessory', cost:{'Orc Tusk':2,'Oracle Wisp':1}, desc:'+1 extra material on a successful hunt.' },
+  'Compass':        { type:'accessory', cost:{'Kaisel Scale':1,'Orc Tusk':2}, desc:'+1 extra Ascension Progress on a successful hunt.' }
+};
+const GEAR_ICON={ 'Basic Bow':'\u{1F3F9}', 'Upgraded Bow':'\u{1F3F9}✨', 'Basic Sword':'⚔️', 'Upgraded Sword':'\u{1F5E1}️', 'Shield':'\u{1F6E1}️', 'Lucky Coin':'\u{1F340}', 'Compass':'\u{1F9ED}' };
+const EVENTS=[
+  {label:'Windfall', apply:function(g,pools){const f=floors[g.idx]; if(pools[g.idx]>0&&addMat(g,f.name,1)){pools[g.idx]-=1; return g.name+' finds a Windfall cache: +1 '+f.name+'.';} return g.name+' finds a Windfall cache, but storage is full.';}},
+  {label:'Ambush', apply:function(g){g.progress=Math.max(0,g.progress-1); return g.name+' is Ambushed by lesser beasts: -1 progress.';}},
+  {label:'Guild rally', apply:function(g){g.ap+=1; return g.name+' hears a Guild Rally horn: +1 action point this turn.';}},
+  {label:'Curse mist', apply:function(g){g.eventCurse=true; return 'Curse mist settles over '+g.name+': their next Hunt this turn auto-fails.';}},
+  {label:'Old cache', apply:function(g){const prevIdx=Math.max(0,g.idx-1); const pn=floors[prevIdx].name; if(addMat(g,pn,1)) return g.name+' unearths an Old Cache: +1 '+pn+'.'; return g.name+' finds an Old Cache, but storage is full.';}},
+  {label:'Quiet floor', apply:function(){ return 'The floor is quiet. Nothing happens.';}}
+];
+
+let deviceId = localStorage.getItem('ascension_device_id');
+if(!deviceId){ deviceId='d'+Math.random().toString(36).slice(2,10); localStorage.setItem('ascension_device_id', deviceId); }
+
+let roomCode=null, myGuildIndex=null, state=null, LOCAL_MODE=false;
+let botStepScheduled=false, botTradeScheduled=false;
+function roomRef(){ return ref(db, 'rooms/'+roomCode); }
+
+function screens(){ return ['screenHome','screenCreate','screenIdentity','screenJoin','screenSlots','screenLobby']; }
+function showScreen(id){ screens().forEach(function(s){ document.getElementById(s).style.display = (s===id)?(s==='screenHome'?'block':'block'):'none'; }); document.getElementById('game').style.display='none'; document.body.classList.remove('in-game'); }
+function showGame(){ screens().forEach(function(s){ document.getElementById(s).style.display='none'; }); document.getElementById('game').style.display='flex'; document.body.classList.add('in-game'); }
+
+// ---- home mode toggle ----
+document.getElementById('modeLocalBtn').onclick=function(){
+  document.getElementById('modeLocalBtn').classList.add('sel');
+  document.getElementById('modeOnlineBtn').classList.remove('sel');
+  document.getElementById('homeLocalPanel').style.display='block';
+  document.getElementById('homeOnlinePanel').style.display='none';
+};
+document.getElementById('modeOnlineBtn').onclick=function(){
+  document.getElementById('modeOnlineBtn').classList.add('sel');
+  document.getElementById('modeLocalBtn').classList.remove('sel');
+  document.getElementById('homeOnlinePanel').style.display='block';
+  document.getElementById('homeLocalPanel').style.display='none';
+};
+
+function openHowTo(){ document.getElementById('howToOverlay').classList.add('show'); }
+function closeHowTo(){ document.getElementById('howToOverlay').classList.remove('show'); }
+document.getElementById('btnHowToHome').onclick=openHowTo;
+document.getElementById('btnHowToGame').onclick=openHowTo;
+document.getElementById('btnCloseHowTo').onclick=closeHowTo;
+document.getElementById('howToOverlay').onclick=function(e){ if(e.target.id==='howToOverlay') closeHowTo(); };
+
+document.getElementById('btnGoCreate').onclick=function(){ showScreen('screenCreate'); };
+document.getElementById('btnBackFromCreate').onclick=function(){ showScreen('screenHome'); };
+document.getElementById('btnGoJoin').onclick=function(){ showScreen('screenJoin'); };
+document.getElementById('btnBackFromJoin').onclick=function(){ showScreen('screenHome'); };
+document.getElementById('btnBackFromSlots').onclick=function(){ showScreen('screenJoin'); };
+
+// ---- identity (name + color) step, shared by local and online-create flows ----
+let pendingFlow=null; // 'local' or 'online'
+let identityColorIdx=0;
+const colorGrid=document.getElementById('colorGrid');
+COLOR_OPTIONS.forEach(function(opt,i){
+  const b=document.createElement('div');
+  b.className='colorOpt'+(i===0?' sel':'');
+  b.style.color=opt.color;
+  b.innerHTML='<span class="ic">'+opt.icon+'</span><span class="nm">'+opt.name+'</span>';
+  b.onclick=function(){
+    identityColorIdx=i;
+    Array.from(colorGrid.children).forEach(function(c){c.classList.remove('sel');});
+    b.classList.add('sel');
+  };
+  colorGrid.appendChild(b);
+});
+function openIdentity(flow){
+  pendingFlow=flow;
+  document.getElementById('identityName').value='';
+  document.getElementById('identityErr').textContent='';
+  identityColorIdx=0;
+  Array.from(colorGrid.children).forEach(function(c,i){c.classList.toggle('sel', i===0);});
+  showScreen('screenIdentity');
+}
+document.getElementById('btnLocalNext').onclick=function(){ openIdentity('local'); };
+document.getElementById('btnCreateNext').onclick=function(){ openIdentity('online'); };
+document.getElementById('btnBackFromIdentity').onclick=function(){ showScreen(pendingFlow==='local' ? 'screenHome' : 'screenCreate'); };
+
+function colorsForRoom(n, chosenIdx){
+  const pool=COLOR_OPTIONS.map(function(o){return o.color;});
+  const chosen=pool.splice(chosenIdx,1)[0];
+  const ordered=[chosen].concat(pool);
+  return ordered.slice(0,n);
+}
+
+document.getElementById('btnIdentityGo').onclick=async function(){
+  const name=document.getElementById('identityName').value.trim();
+  const errEl=document.getElementById('identityErr');
+  if(!name){ errEl.textContent='Give your guild a name.'; return; }
+  errEl.textContent='';
+  const chosenColor=COLOR_OPTIONS[identityColorIdx].color;
+
+  if(pendingFlow==='local'){
+    LOCAL_MODE=true; roomCode=null; myGuildIndex=0;
+    state=freshState(localN);
+    const colors=colorsForRoom(localN, identityColorIdx);
+    state.guilds.forEach(function(g,i){ g.color=colors[i]; });
+    state.guilds[0].name=name;
+    state.guilds[0].claimedBy='local';
+    for(let i=1;i<localN;i++){ state.guilds[i].isBot=true; state.guilds[i].claimedBy='bot'; }
+    state.started=true;
+    state.log=[{t:'Practice game started. '+state.guilds[0].name+' (you) goes first.', cls:''}];
+    document.getElementById('roomTag').textContent='Local practice game';
+    showGame();
+    render();
+    return;
+  }
+
+  const btn=document.getElementById('btnIdentityGo');
+  btn.disabled=true; btn.textContent='Creating...';
+  try{
+    LOCAL_MODE=false;
+    roomCode=genCode();
+    const s=freshState(createN);
+    const colors=colorsForRoom(createN, identityColorIdx);
+    s.guilds.forEach(function(g,i){ g.color=colors[i]; });
+    s.guilds[0].name=name;
+    s.guilds[0].claimedBy=deviceId;
+    await set(roomRef(), s);
+    myGuildIndex=0;
+    localStorage.setItem('ascension_room', roomCode);
+    localStorage.setItem('ascension_slot_'+roomCode, '0');
+    attachListener();
+  } catch(e){
+    console.error(e);
+    errEl.textContent = 'Could not create room: ' + (e && e.message ? e.message : e) + '. Check that Realtime Database (not Firestore) is created in the Firebase console, and that its rules allow read/write.';
+    showScreen('screenIdentity');
+  } finally {
+    btn.disabled=false; btn.textContent='Next';
+  }
+};
+
+let createN=2;
+const countRow=document.getElementById('countRow');
+[2,3,4].forEach(function(n){
+  const b=document.createElement('button');
+  b.className='count-btn'+(n===2?' sel':'');
+  b.textContent=n;
+  b.onclick=function(){ createN=n; Array.from(countRow.children).forEach(function(c){c.classList.remove('sel');}); b.classList.add('sel'); };
+  countRow.appendChild(b);
+});
+
+let localN=2;
+const localCountRow=document.getElementById('localCountRow');
+[2,3,4].forEach(function(n){
+  const b=document.createElement('button');
+  b.className='count-btn'+(n===2?' sel':'');
+  b.textContent=n;
+  b.onclick=function(){ localN=n; Array.from(localCountRow.children).forEach(function(c){c.classList.remove('sel');}); b.classList.add('sel'); };
+  localCountRow.appendChild(b);
+});
+
+function genCode(){ const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<4;i++) s+=chars[Math.floor(Math.random()*chars.length)]; return s; }
+function freshGuild(i){ return { name:'Guild '+String.fromCharCode(65+i), color:PALETTE[i], idx:0, progress:0, ap:2, mat:{}, gear:[], turnsOnFloor:1, eventCurse:false, hexCurse:false, claimedBy:null, isBot:false }; }
+function freshState(n){
+  return {
+    numPlayers: n,
+    guilds: Array.from({length:n}, function(_,i){ return freshGuild(i); }),
+    pools: floors.map(function(){ return START_POOL; }),
+    current: 0,
+    winner: null,
+    started: false,
+    turnCount: 1,
+    lastHunt: null,
+    log: [{t:'Room created. Waiting for guilds to join.', cls:''}],
+    pendingTrade: null,
+    clearedThrough: -1,
+    outbreakFloor: 0,
+    outbreakTimer: floors[0].need+2
+  };
+}
+
+document.getElementById('btnFindRoom').onclick=async function(){
+  const code=document.getElementById('joinCodeInput').value.trim().toUpperCase();
+  const errEl=document.getElementById('joinErr');
+  errEl.textContent='';
+  if(code.length!==4){ errEl.textContent='Enter the 4-letter code.'; return; }
+  try{
+    const snap=await get(ref(db,'rooms/'+code));
+    if(!snap.exists()){ errEl.textContent='No room found with that code.'; return; }
+    LOCAL_MODE=false;
+    roomCode=code;
+    renderSlotPicker(snap.val());
+    showScreen('screenSlots');
+  } catch(e){
+    console.error(e);
+    errEl.textContent = 'Could not reach the room: ' + (e && e.message ? e.message : e) + '. Check that Realtime Database is created and its rules allow read/write.';
+  }
+};
+
+function renderSlotPicker(s){
+  const row=document.getElementById('slotRow');
+  row.innerHTML='';
+  s.guilds.forEach(function(g,i){
+    const b=document.createElement('button');
+    b.className='slotBtn';
+    const taken = !!g.claimedBy;
+    b.innerHTML='<span><span class="dotc" style="background:'+g.color+'"></span>'+g.name+'</span><span class="tag'+(g.isBot?' bot':'')+'">'+(g.isBot?'AI':(taken?'taken':'open'))+'</span>';
+    if(taken) b.disabled=true;
+    b.onclick=async function(){
+      const fresh=await get(roomRef());
+      const fs=fresh.val();
+      if(fs.guilds[i].claimedBy){ renderSlotPicker(fs); return; }
+      const nm=prompt('Name your guild:', fs.guilds[i].name);
+      if(nm===null) return;
+      if(nm.trim()) fs.guilds[i].name=nm.trim().slice(0,18);
+      fs.guilds[i].claimedBy=deviceId;
+      await set(roomRef(), fs);
+      myGuildIndex=i;
+      localStorage.setItem('ascension_room', roomCode);
+      localStorage.setItem('ascension_slot_'+roomCode, String(i));
+      attachListener();
+    };
+    row.appendChild(b);
+  });
+}
+
+function attachListener(){
+  onValue(roomRef(), function(snap){
+    state=snap.val();
+    if(!state) return;
+    if(!state.started){ renderLobby(); showScreen('screenLobby'); }
+    else { document.getElementById('roomTag').innerHTML='Room <b>'+roomCode+'</b>'; showGame(); render(); }
+  });
+}
+
+function renderLobby(){
+  document.getElementById('lobbyCode').textContent=roomCode;
+  const row=document.getElementById('lobbySlots');
+  row.innerHTML=state.guilds.map(function(g,i){
+    const you = g.claimedBy===deviceId;
+    const tag = g.isBot ? 'AI' : (g.claimedBy?'ready':'waiting');
+    return '<div class="slotBtn"><span><span class="dotc" style="background:'+g.color+'"></span>'+g.name+(you?' (you)':'')+'</span><span class="tag'+(g.isBot?' bot':'')+'">'+tag+'</span></div>';
+  }).join('');
+  const claimedCount=state.guilds.filter(function(g){return !!g.claimedBy;}).length;
+  const openSlot=state.guilds.some(function(g){return !g.claimedBy;});
+  document.getElementById('btnAddBot').disabled=!openSlot;
+  document.getElementById('lobbyHint').textContent = claimedCount<2 ? 'Need at least 2 guilds claimed (human or AI) to start.' : (claimedCount+' of '+state.guilds.length+' guilds ready. Anyone can start.');
+  document.getElementById('btnStartGame').disabled = claimedCount<2;
+}
+document.getElementById('btnStartGame').onclick=async function(){
+  const s=(await get(roomRef())).val();
+  s.started=true;
+  s.log.unshift({t:s.guilds[0].name+' goes first.', cls:''});
+  await set(roomRef(), s);
+};
+document.getElementById('btnAddBot').onclick=async function(){
+  const s=(await get(roomRef())).val();
+  const idx=s.guilds.findIndex(function(g){return !g.claimedBy;});
+  if(idx===-1) return;
+  s.guilds[idx].isBot=true;
+  s.guilds[idx].claimedBy='bot';
+  s.log.unshift({t:s.guilds[idx].name+' is now controlled by AI.', cls:''});
+  await set(roomRef(), s);
+  renderLobby();
+};
+
+// ---- leave / back ----
+function clearLocalStorageRoom(){
+  if(roomCode){ localStorage.removeItem('ascension_slot_'+roomCode); }
+  localStorage.removeItem('ascension_room');
+}
+function leaveOnline(){
+  if(roomCode){ try{ off(roomRef()); }catch(e){} }
+  clearLocalStorageRoom();
+  roomCode=null; myGuildIndex=null; state=null;
+  showScreen('screenHome');
+}
+function leaveGame(){
+  if(LOCAL_MODE){ LOCAL_MODE=false; state=null; showScreen('screenHome'); }
+  else { leaveOnline(); }
+}
+document.getElementById('btnLeaveLobby').onclick=leaveOnline;
+document.getElementById('btnLeaveGame').onclick=function(){
+  if(confirm('Leave this game and return to the home screen?')) leaveGame();
+};
+
+// ---- auto-rejoin ----
+(function tryAutoRejoin(){
+  const savedRoom=localStorage.getItem('ascension_room');
+  const savedSlot=localStorage.getItem('ascension_slot_'+savedRoom);
+  if(savedRoom && savedSlot!==null){
+    get(ref(db,'rooms/'+savedRoom)).then(function(snap){
+      if(snap.exists()){
+        LOCAL_MODE=false;
+        roomCode=savedRoom; myGuildIndex=parseInt(savedSlot,10);
+        attachListener();
+      } else { showScreen('screenHome'); }
+    }).catch(function(){ showScreen('screenHome'); });
+  } else { showScreen('screenHome'); }
+})();
+
+// ---- game helpers ----
+function me(){ return state.guilds[state.current]; }
+function isMyTurn(){ return myGuildIndex===state.current; }
+function others(){ return state.guilds.map(function(g,i){return {g:g,i:i};}).filter(function(o){ return o.i!==state.current; }); }
+function trailing(){ const min=Math.min.apply(null, state.guilds.map(function(g){return g.idx;})); return me().idx===min && state.guilds.some(function(g){return g.idx>min;}); }
+function addLog(t, cls){ state.log = state.log||[]; state.log.unshift({t:t, cls:cls||''}); if(state.log.length>7) state.log=state.log.slice(0,7); }
+function canAdd(g,name){ const mat=g.mat||{}; return mat.hasOwnProperty(name) || Object.keys(mat).length<CAP; }
+function addMat(g,name,qty){ if(!canAdd(g,name)) return false; g.mat=g.mat||{}; g.mat[name]=(g.mat[name]||0)+qty; return true; }
+function stockKeys(g){ const mat=g.mat||{}; return Object.keys(mat).filter(function(k){return mat[k]>0;}); }
+function steal(from,to){ const keys=stockKeys(from); if(!keys.length) return null; const p=keys[Math.floor(Math.random()*keys.length)]; from.mat[p]-=1; if(from.mat[p]===0) delete from.mat[p]; return addMat(to,p,1)?p:null; }
+async function pushState(){ await set(roomRef(), state); }
+
+async function withState(fn){
+  if(LOCAL_MODE){
+    fn();
+    render();
+    return;
+  }
+  const fresh=(await get(roomRef())).val();
+  state=fresh;
+  fn();
+  await pushState();
+}
+
+function render(){
+  if(!state) return;
+  const pool=state.pools[me().idx];
+  const f=floors[me().idx];
+  document.getElementById('floorTitle').textContent='Floor '+(me().idx+1)+', '+f.name+', DR '+f.dr+'+';
+  document.getElementById('floorSub').textContent=(f.toll>0?('Toll to ascend: '+f.toll+' '+f.name):'Final floor, defeat the Sovereign to win')+' &middot; Pool left: '+pool;
+
+  const arena=document.getElementById('arena');
+  (function(){
+    const active=me();
+    const activeIdx=state.current;
+    const activeGf=floors[active.idx];
+    const keys=stockKeys(active);
+    const activeYou = active.claimedBy===deviceId || (LOCAL_MODE && activeIdx===0);
+    const gameWon = state.winner!==null && state.winner!==undefined;
+    const placematShowing = isMyTurn() && !active.isBot && !gameWon;
+    const fullPanel = '<div class="guildPanel glass" style="border-left-color:'+active.color+(gameWon?'':';box-shadow:0 0 16px '+active.color+'44')+';">'+
+      '<h3><span class="dot" style="width:8px;height:8px;border-radius:50%;background:'+active.color+';box-shadow:0 0 6px '+active.color+';display:inline-block;"></span>'+active.name+(gameWon?'':' <span style="color:'+active.color+';font-size:10.5px;">&middot; turn</span>')+(activeYou?' <span class="youTag">you</span>':'')+(active.isBot?' <span class="botTag">AI</span>':'')+(active.hexCurse?' <span class="curseTag">cursed</span>':'')+'</h3>'+
+      '<div class="miniStats">'+
+        '<div class="miniStat"><div class="l">Floor</div><div class="v">'+(active.idx+1)+'</div></div>'+
+        '<div class="miniStat"><div class="l">Progress</div><div class="v">'+active.progress+' / '+activeGf.need+'</div></div>'+
+        '<div class="miniStat"><div class="l">AP</div><div class="v">'+active.ap+'</div></div>'+
+        '<div class="miniStat"><div class="l">Turns on floor</div><div class="v">'+active.turnsOnFloor+'</div></div>'+
+      '</div>'+
+      (placematShowing ? '' :
+        '<p class="line"><b style="color:var(--text-hi)">Materials:</b> '+(keys.length?keys.map(function(k){return k+' x'+active.mat[k];}).join(', '):'empty')+'</p>'+
+        '<p class="line"><b style="color:var(--text-hi)">Gear:</b> '+((active.gear||[]).length?active.gear.join(', '):'none')+'</p>')+
+    '</div>';
+
+    const rivalChips = others().map(function(o){
+      const g=o.g;
+      const you = g.claimedBy===deviceId || (LOCAL_MODE && o.i===0);
+      return '<div class="rivalChip" style="border-color:'+g.color+'66;">'+
+        '<span class="dot" style="background:'+g.color+';box-shadow:0 0 6px '+g.color+';"></span>'+
+        '<span class="rname">'+g.name+'</span>'+
+        '<span class="rap">AP '+g.ap+'</span>'+
+        (you?' <span class="youTag">you</span>':'')+(g.isBot?' <span class="botTag">AI</span>':'')+(g.hexCurse?' <span class="curseTag">cursed</span>':'')+
+      '</div>';
+    }).join('');
+
+    arena.innerHTML = fullPanel + (rivalChips ? '<div class="rivalRow">'+rivalChips+'</div>' : '');
+  })();
+
+  const won = state.winner!==null && state.winner!==undefined;
+  document.getElementById('turnBanner').innerHTML = won
+    ? '<span>Game over</span><span class="hint"></span>'
+    : '<span><span class="dot" style="background:'+me().color+';color:'+me().color+'"></span>'+me().name+(me().isBot?' — AI thinking':(isMyTurn()?" — your turn":" — waiting"))+'</span><span class="hint">Turn '+(state.turnCount||1)+' &middot; '+me().ap+' action points &middot; floor '+(me().idx+1)+'</span>';
+
+  if(won){
+    document.getElementById('winBanner').style.display='block';
+    document.getElementById('winBanner').textContent=state.guilds[state.winner].name+' defeated the Sovereign and wins the game.';
+  } else {
+    document.getElementById('winBanner').style.display='none';
+  }
+
+  const canAct = isMyTurn() && !won && !me().isBot;
+  ['btnHunt','btnTrain','btnRaid','btnTradeToggle','btnSabotageToggle','btnBlacksmithToggle','btnTransmute','btnAscend'].forEach(function(id){
+    document.getElementById(id).disabled = !canAct;
+  });
+  document.getElementById('btnEndTurn').disabled = !canAct;
+
+  document.getElementById('log').innerHTML = (state.log||[]).map(function(l){return '<div class="'+(l.cls||'')+'">'+l.t+'</div>';}).join('');
+
+  document.getElementById('headerAvatars').innerHTML = state.guilds.map(function(g,i){
+    return '<div class="avatarChip'+(i===state.current&&!won?' turn':'')+'" style="background:'+g.color+'" title="'+g.name+'">'+g.name.charAt(0).toUpperCase()+'</div>';
+  }).join('');
+
+  document.getElementById('huntSub').textContent = '1 AP, 2d6 vs DR'+f.dr;
+  document.getElementById('trainSub').textContent = '1 AP, 2 '+f.name;
+  document.getElementById('transmuteSub').textContent = f.tcost+' materials for 1';
+  document.getElementById('ascendSub').textContent = f.toll>0 ? ('pay '+f.toll+' '+f.name) : 'defeat the Sovereign';
+
+  renderPlacemat();
+  renderOutbreakBadge();
+  refreshTargetSelects();
+  renderTradeOffer();
+  renderTower();
+  renderDice();
+  maybeBotContinue();
+}
+
+function renderOutbreakBadge(){
+  const el=document.getElementById('outbreakBadge');
+  if(!el) return;
+  if(state.outbreakFloor===undefined || state.outbreakFloor===null){ el.innerHTML=''; return; }
+  const fl=floors[state.outbreakFloor];
+  const t=state.outbreakTimer;
+  el.classList.toggle('warn', t<=2);
+  el.innerHTML =
+    '<div class="obLabel">Outbreak Timer<b>Floor '+(state.outbreakFloor+1)+', '+fl.name+'</b></div>'+
+    '<div class="obCount">'+Math.max(0,t)+'</div>';
+}
+
+function renderPlacemat(){
+  const wrap=document.getElementById('myPlacemat');
+  const show = isMyTurn() && !me().isBot && (state.winner===null || state.winner===undefined);
+  wrap.classList.toggle('show', show);
+  if(!show) return;
+  const g=me();
+  const keys=stockKeys(g);
+  const gear=g.gear||[];
+
+  const matChips=keys.map(function(k){
+    const fi=floors.findIndex(function(fl){return fl.name===k;});
+    const ic=fi>=0?FLOOR_ICON[fi]:'&#x1F4E6;';
+    return '<div class="matChip"><span class="ic">'+ic+'</span><span>'+k+'</span><span class="qty">x'+g.mat[k]+'</span></div>';
+  });
+  const gearChips=gear.map(function(name){
+    const ic=GEAR_ICON[name]||'&#x1F392;';
+    return '<div class="matChip gear"><span class="ic">'+ic+'</span><span>'+name+'</span></div>';
+  });
+
+  document.getElementById('placematMats').innerHTML = matChips.length
+    ? matChips.join('')
+    : '<div class="matChip empty"><span class="ic">&#x1F392;</span><span>None yet, go hunt</span></div>';
+  document.getElementById('placematGear').innerHTML = gearChips.length
+    ? gearChips.join('')
+    : '<div class="matChip empty"><span class="ic">&#x2694;&#xFE0F;</span><span>None crafted yet</span></div>';
+}
+
+function renderTower(){
+  const list=document.getElementById('towerList');
+  const rows=[];
+  for(let i=floors.length-1;i>=0;i--){
+    const fl=floors[i];
+    const here=state.guilds.filter(function(g){return g.idx===i;});
+    const hereNow=here.some(function(g){return state.guilds.indexOf(g)===state.current;});
+    const tint=FLOOR_TINT[i];
+
+    const pipRows=here.map(function(g){
+      const filled=Math.min(g.progress, fl.need);
+      let pips='';
+      for(let p=0;p<fl.need;p++){
+        pips+='<span class="pip'+(p<filled?' filled':'')+'"></span>';
+      }
+      return '<div class="pipTrack" style="color:'+g.color+'"><span class="pips">'+pips+'</span><span class="pipLabel">'+g.name.charAt(0).toUpperCase()+' '+g.progress+'/'+fl.need+'</span></div>';
+    }).join('');
+
+    const poolTotal=START_POOL;
+    const poolLeft=state.pools[i];
+    let poolPips='';
+    for(let p=0;p<poolTotal;p++){
+      poolPips+='<span class="pip'+(p<poolLeft?' filled':'')+'"></span>';
+    }
+
+    rows.push(
+      '<div class="floorRow'+(hereNow?' hereNow':'')+'" style="background:linear-gradient(135deg,'+tint+'16,'+tint+'09); border-color:'+tint+'40;">'+
+        '<div class="frTop"><span>Floor '+(i+1)+'</span><span>DR '+fl.dr+'+</span></div>'+
+        '<div class="frName"><span class="frIcon">'+FLOOR_ICON[i]+'</span><span>'+fl.name+'</span></div>'+
+        '<div class="frMeta">'+(fl.toll>0?('Toll '+fl.toll+' '+fl.name):'Final floor — defeat the Sovereign')+'</div>'+
+        (here.length ? ('<div class="frMarkers">'+here.map(function(g){
+            return '<div class="frMarker" style="background:'+g.color+';color:'+g.color+'" title="'+g.name+', '+g.progress+'/'+fl.need+'">'+g.name.charAt(0).toUpperCase()+'</div>';
+          }).join('')+'</div>'+pipRows) : '<div class="frMeta" style="opacity:0.6;">No guild here yet</div>')+
+        '<div class="poolTrack"><span class="pips">'+poolPips+'</span><span class="poolLabel">pool '+poolLeft+'/'+poolTotal+'</span></div>'+
+      '</div>'
+    );
+  }
+  list.innerHTML=rows.join('');
+}
+
+function popAnimate(el){
+  if(!el) return;
+  el.classList.remove('pop');
+  void el.offsetWidth;
+  el.classList.add('pop');
+}
+
+function renderDice(){
+  const box=document.getElementById('diceReveal');
+  const h=state.lastHunt;
+  if(!h){
+    box.innerHTML =
+      '<p style="font-size:11.5px;color:var(--text-mid);margin:0 0 4px;">'+me().name+' ready to hunt</p>'+
+      '<div class="diceRow"><div class="diceCube idle">1</div><span class="plus">+</span><div class="diceCube idle">1</div></div>'+
+      '<p style="font-size:12px;color:var(--text-dim);">Hunt to roll against DR '+floors[me().idx].dr+'</p>'+
+      '<p class="resultLine" style="visibility:hidden;">placeholder</p>';
+    return;
+  }
+  const resultCls = h.snake ? 'fail' : h.crit ? 'crit' : h.success ? 'success' : 'fail';
+  const resultText = h.snake ? (h.stolenFrom ? (h.guildName+' steals from '+h.stolenFrom+'!') : (h.guildName+' loses 1 progress.'))
+    : h.crit ? 'Critical hunt! +2 progress, action point refunded.'
+    : h.success ? 'Success! +1 progress.'
+    : 'Failed.';
+  box.innerHTML =
+    '<p style="font-size:11.5px;color:var(--text-mid);margin:0 0 4px;">'+h.guildName+' hunts '+h.matName+'</p>'+
+    '<div class="diceRow"><div class="diceCube" id="dc1">'+h.d1+'</div><span class="plus">+</span><div class="diceCube" id="dc2">'+h.d2+'</div></div>'+
+    (h.snake ? '<p style="font-size:12px;color:var(--text-dim);">snake eyes</p>' : '<p style="font-size:12px;color:var(--text-dim);">total '+h.total+' vs DR '+h.dr+'</p>')+
+    '<p class="resultLine '+resultCls+'">'+resultText+'</p>';
+  popAnimate(document.getElementById('dc1'));
+  popAnimate(document.getElementById('dc2'));
+}
+
+function refreshTargetSelects(){
+  const opts = others().map(function(o){ return '<option value="'+o.i+'">'+o.g.name+'</option>'; }).join('');
+  ['tradeTarget','sabTarget'].forEach(function(id){
+    const sel=document.getElementById(id);
+    const prev=sel.value;
+    sel.innerHTML=opts;
+    if(prev) sel.value=prev;
+  });
+  const allMats=floors.map(function(f){return f.name;});
+  const giveMat=document.getElementById('tradeGiveMat');
+  giveMat.innerHTML = stockKeys(me()).map(function(k){return '<option value="'+k+'">'+k+'</option>';}).join('') || '<option value="">none</option>';
+  const giveQty=document.getElementById('tradeGiveQty');
+  const maxGive = (me().mat||{})[giveMat.value] || 0;
+  giveQty.innerHTML = Array.from({length: Math.max(1,maxGive)}, function(_,i){return i+1;}).map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
+  const wantMat=document.getElementById('tradeWantMat');
+  wantMat.innerHTML = allMats.map(function(m){return '<option value="'+m+'">'+m+'</option>';}).join('');
+  const wantQty=document.getElementById('tradeWantQty');
+  wantQty.innerHTML = [1,2,3].map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
+  const sabMat=document.getElementById('sabMat');
+  sabMat.innerHTML = stockKeys(me()).map(function(k){return '<option value="'+k+'">'+k+'</option>';}).join('') || '<option value="">none</option>';
+}
+document.getElementById('tradeGiveMat').onchange=refreshTargetSelects;
+
+function renderTradeOffer(){
+  const banner=document.getElementById('tradeOfferBanner');
+  const pt=state.pendingTrade;
+  if(pt && pt.to===myGuildIndex && !state.guilds[pt.to].isBot){
+    const from=state.guilds[pt.from];
+    banner.classList.add('show');
+    banner.innerHTML = '<b>'+from.name+'</b> offers you '+pt.giveQty+' '+pt.giveMat+' for your '+pt.wantQty+' '+pt.wantMat+'.'+
+      '<div class="submitRow"><button class="act trade" id="btnAcceptTrade">Accept</button><button class="act" id="btnDeclineTrade">Decline</button></div>';
+    document.getElementById('btnAcceptTrade').onclick=function(){
+      withState(function(){ resolveTrade(true); });
+    };
+    document.getElementById('btnDeclineTrade').onclick=function(){
+      withState(function(){ resolveTrade(false); });
+    };
+  } else {
+    banner.classList.remove('show');
+    banner.innerHTML='';
+  }
+}
+
+function resolveTrade(accept){
+  const p=state.pendingTrade;
+  if(!p) return;
+  const fromG=state.guilds[p.from], toG=state.guilds[p.to];
+  if(accept){
+    if((toG.mat[p.wantMat]||0)<p.wantQty || (fromG.mat[p.giveMat]||0)<p.giveQty){
+      addLog('Trade could not complete, materials had changed.', 'st');
+    } else {
+      fromG.mat[p.giveMat]-=p.giveQty; if(fromG.mat[p.giveMat]===0) delete fromG.mat[p.giveMat];
+      toG.mat[p.wantMat]-=p.wantQty; if(toG.mat[p.wantMat]===0) delete toG.mat[p.wantMat];
+      addMat(toG,p.giveMat,p.giveQty);
+      addMat(fromG,p.wantMat,p.wantQty);
+      addLog(fromG.name+' and '+toG.name+' complete a trade: '+p.giveQty+' '+p.giveMat+' for '+p.wantQty+' '+p.wantMat+'.', 'ev');
+    }
+  } else {
+    addLog(toG.name+' declines the trade offer.');
+  }
+  state.pendingTrade=null;
+}
+
+function checkFloorCamping(g){
+  if(g.turnsOnFloor>CAMP_LIMIT){
+    const keys=stockKeys(g);
+    if(keys.length){ const p=keys[Math.floor(Math.random()*keys.length)]; g.mat[p]-=1; if(g.mat[p]===0) delete g.mat[p]; }
+    g.progress=Math.max(0,g.progress-1); g.turnsOnFloor=1;
+    addLog(g.name+' camped Floor '+(g.idx+1)+' too long, the Monster attacks: -1 progress'+(keys.length?', -1 material.':'.'), 'st');
+  }
+}
+function maybeDrawEvent(g){
+  const roll=1+Math.floor(Math.random()*6);
+  if(roll>=5){
+    const ev=EVENTS[Math.floor(Math.random()*EVENTS.length)];
+    addLog('Tower Event, '+ev.label+': '+ev.apply(g, state.pools), 'ev');
+  }
+}
+function nextIndex(){ return (state.current+1)%state.guilds.length; }
+
+// ---- Monster Outbreak (section 13 of Rules of Play) ----
+function resetOutbreakTimer(){
+  state.outbreakFloor = Math.min(state.clearedThrough+1, floors.length-1);
+  state.outbreakTimer = floors[state.outbreakFloor].need + 2;
+}
+function triggerOutbreak(){
+  let leadIdx=0;
+  state.guilds.forEach(function(g,i){
+    const lead=state.guilds[leadIdx];
+    if(g.idx>lead.idx || (g.idx===lead.idx && g.progress>lead.progress)) leadIdx=i;
+  });
+  state.guilds.forEach(function(g,i){
+    const loss = i===leadIdx ? 2 : 1;
+    g.progress=Math.max(0,g.progress-loss);
+  });
+  addLog('Monster Outbreak on Floor '+(state.outbreakFloor+1)+'! '+state.guilds[leadIdx].name+' (furthest ahead) loses 2 progress, every other Guild loses 1.', 'st');
+  resetOutbreakTimer();
+}
+
+// ---- core actions (shared by human buttons and the AI bot) ----
+function endTurnAction(){
+  if(state.winner!==null && state.winner!==undefined) return;
+  const wrapped = nextIndex()===0;
+  state.current=nextIndex();
+  state.turnCount=(state.turnCount||1)+1;
+  state.lastHunt=null;
+  const g=me();
+  g.ap=2; g.hexCurse=false;
+  checkFloorCamping(g);
+  addLog('--- '+g.name+"'s turn begins. ---");
+  maybeDrawEvent(g);
+  if(wrapped){
+    if(state.outbreakTimer===undefined || state.outbreakTimer===null) resetOutbreakTimer();
+    state.outbreakTimer-=1;
+    if(state.outbreakTimer<=0) triggerOutbreak();
+  }
+}
+function huntAction(){
+  const g=me(), f=floors[g.idx];
+  if(state.winner!==null && state.winner!==undefined) return;
+  if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
+  if(g.eventCurse){ g.eventCurse=false; g.ap-=1; addLog(g.name+"'s Hunt is swallowed by curse mist, automatic failure.", 'st'); return; }
+
+  const gear=g.gear||[];
+  const hasUpBow=gear.includes('Upgraded Bow'), hasBasicBow=gear.includes('Basic Bow');
+  const hasUpSword=gear.includes('Upgraded Sword'), hasBasicSword=gear.includes('Basic Sword');
+  const hasShield=gear.includes('Shield'), hasCoin=gear.includes('Lucky Coin'), hasCompass=gear.includes('Compass');
+
+  let d1=1+Math.floor(Math.random()*6), d2=1+Math.floor(Math.random()*6);
+  let bowBonus=0, gearNote='';
+  if(hasBasicBow||hasUpBow){
+    const rerollFirst=d1<=d2;
+    const rerolled=1+Math.floor(Math.random()*6);
+    if(hasUpBow){ bowBonus=rerolled; gearNote+=' (Upgraded Bow +'+rerolled+')'; }
+    else { if(rerollFirst) d1=rerolled; else d2=rerolled; gearNote+=' (Bow reroll)'; }
+  }
+  const swordBonus = hasUpSword?4:(hasBasicSword?2:0);
+  if(swordBonus) gearNote+=' (+'+swordBonus+' sword)';
+
+  const behind=trailing();
+  let total=d1+d2+bowBonus+swordBonus+(behind?1:0)-(g.hexCurse?2:0);
+  g.ap-=1;
+  const hunt={ guildName:g.name, matName:f.name, d1:d1, d2:d2, total:total, dr:f.dr, snake:false, crit:false, success:false, stolenFrom:null, gearNote:gearNote };
+
+  function successExtras(){
+    let extra='';
+    if(hasCoin && state.pools[g.idx]>0 && addMat(g,f.name,1)){ state.pools[g.idx]-=1; extra+=' Lucky Coin: +1 extra '+f.name+'.'; }
+    if(hasCompass){ g.progress+=1; extra+=' Compass: +1 extra progress.'; }
+    return extra;
+  }
+
+  if(d1===6&&d2===6){
+    g.progress+=2; if(state.pools[g.idx]>0&&addMat(g,f.name,1)) state.pools[g.idx]-=1;
+    g.ap+=1;
+    hunt.crit=true; hunt.success=true;
+    addLog(g.name+' rolls double sixes! Critical hunt: +2 progress, action point refunded.'+gearNote+successExtras());
+  } else if(d1===1&&d2===1){
+    hunt.snake=true;
+    const targets=others().filter(function(o){return stockKeys(o.g).length;});
+    if(targets.length){
+      const t=targets[Math.floor(Math.random()*targets.length)].g;
+      const s=steal(t,g);
+      hunt.stolenFrom=t.name;
+      addLog(g.name+' rolls snake eyes and raids the vault, stealing 1 '+s+' from '+t.name+'.', 'st');
+    } else if(hasShield){
+      addLog(g.name+' rolls snake eyes, but the Shield absorbs it, no penalty.', 'st');
+    } else {
+      g.progress=Math.max(0,g.progress-1);
+      addLog(g.name+' rolls snake eyes. No rival has anything to steal, -1 progress instead.', 'st');
+    }
+  } else if(total>=f.dr){
+    g.progress+=1;
+    hunt.success=true;
+    if(state.pools[g.idx]>0 && addMat(g,f.name,1)){ state.pools[g.idx]-=1; addLog(g.name+' rolls '+total+(behind?' (+1 catch-up)':'')+(g.hexCurse?' (-2 cursed)':'')+gearNote+' vs DR'+f.dr+', success: +1 progress, +1 '+f.name+'.'+successExtras()); }
+    else addLog(g.name+' succeeds but storage is full or the pool is empty. Progress only.'+successExtras());
+  } else {
+    addLog(g.name+' rolls '+total+(behind?' (+1 catch-up)':'')+(g.hexCurse?' (-2 cursed)':'')+gearNote+' vs DR'+f.dr+', failed. Action point spent.');
+  }
+  g.hexCurse=false;
+  state.lastHunt=hunt;
+}
+function trainAction(){
+  const g=me(), f=floors[g.idx];
+  if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
+  if((g.mat[f.name]||0)>=2){ g.mat[f.name]-=2; g.progress+=1; g.ap-=1; addLog(g.name+' trains using 2 '+f.name+', guaranteed +1 progress.'); }
+  else addLog(g.name+' needs 2 '+f.name+' in storage to train.');
+}
+function raidAction(){
+  const g=me();
+  if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
+  const targets=others();
+  if(!targets.length) return;
+  const t=targets[Math.floor(Math.random()*targets.length)].g;
+  g.ap-=1;
+  const roll=1+Math.floor(Math.random()*6);
+  if(roll>=4){
+    const s=steal(t,g);
+    addLog(s? (g.name+' raids '+t.name+' (rolled '+roll+'), stealing 1 '+s+'.') : (g.name+' raids '+t.name+' but they had nothing to take.'), 'st');
+  } else {
+    addLog(g.name+' raids '+t.name+' and rolls '+roll+', fought off.');
+  }
+}
+function affordGear(g,cost){ return Object.keys(cost).every(function(k){ return (g.mat[k]||0)>=cost[k]; }); }
+function payGear(g,cost){ Object.keys(cost).forEach(function(k){ g.mat[k]-=cost[k]; if(g.mat[k]<=0) delete g.mat[k]; }); }
+function eligibleGear(g){
+  const owned=g.gear||[];
+  return Object.keys(GEAR).filter(function(name){
+    const def=GEAR[name];
+    if(owned.includes(name)) return false;
+    if(def.requires) return owned.includes(def.requires);
+    if(def.type==='accessory' && owned.some(function(o){ return GEAR[o]&&GEAR[o].type==='accessory'; })) return false;
+    if(owned.length>=2) return false;
+    if(def.line){
+      const upName=Object.keys(GEAR).find(function(n){ return GEAR[n].line===def.line && GEAR[n].tier===2; });
+      if(upName && owned.includes(upName)) return false;
+    }
+    return true;
+  });
+}
+function craftAction(itemName){
+  const g=me();
+  const def=GEAR[itemName];
+  if(!def) return;
+  g.gear=g.gear||[];
+  if(def.requires){
+    if(!g.gear.includes(def.requires)){ addLog(g.name+' needs a '+def.requires+' before upgrading to '+itemName+'.'); return; }
+    if(!affordGear(g,def.cost)){ addLog(g.name+' cannot afford the upgrade to '+itemName+'.'); return; }
+    payGear(g,def.cost);
+    g.gear=g.gear.map(function(x){ return x===def.requires?itemName:x; });
+    addLog(g.name+' upgrades to a '+itemName+'.');
+    return;
+  }
+  if(def.type==='accessory' && g.gear.some(function(x){ return GEAR[x]&&GEAR[x].type==='accessory'; })){ addLog(g.name+' already carries an accessory, only one at a time.'); return; }
+  if(g.gear.length>=2){ addLog(g.name+' has no open item slot.'); return; }
+  if(!affordGear(g,def.cost)){ addLog(g.name+' cannot afford a '+itemName+'.'); return; }
+  payGear(g,def.cost);
+  g.gear.push(itemName);
+  addLog(g.name+' crafts a '+itemName+'.');
+}
+function transmuteAction(){
+  const g=me(), f=floors[g.idx];
+  let total=0; for(const k in (g.mat||{})) total+=g.mat[k];
+  if(total>=f.tcost){
+    let toSpend=f.tcost;
+    for(const k of Object.keys(g.mat||{})){ if(toSpend<=0) break; const take=Math.min(g.mat[k],toSpend); g.mat[k]-=take; toSpend-=take; if(g.mat[k]===0) delete g.mat[k]; }
+    addMat(g,f.name,1);
+    addLog(g.name+' transmutes '+f.tcost+' materials into 1 '+f.name+'.');
+  } else addLog(g.name+' needs '+f.tcost+' total materials to transmute, has '+total+'.');
+}
+function ascendAction(){
+  const g=me(), f=floors[g.idx];
+  if(g.progress>=f.need && (g.mat[f.name]||0)>=f.toll){
+    if(f.toll>0){ g.mat[f.name]-=f.toll; if(g.mat[f.name]===0) delete g.mat[f.name]; }
+    const clearedIdx=g.idx;
+    if(g.idx===floors.length-1){ state.winner=state.current; addLog(g.name+' defeats the Sovereign and wins the game.', 'wn'); }
+    else { g.idx+=1; g.progress=0; g.turnsOnFloor=1; addLog(g.name+' ascends to Floor '+(g.idx+1)+'.'); }
+    if(clearedIdx>state.clearedThrough){ state.clearedThrough=clearedIdx; resetOutbreakTimer(); addLog('Floor '+(clearedIdx+1)+' is cleared for the first time, the Outbreak Timer moves up.', 'ev'); }
+  } else addLog(g.name+' needs '+f.need+' progress (has '+g.progress+') and '+f.toll+' '+f.name+' toll (has '+(g.mat[f.name]||0)+').');
+}
+
+// ---- button wiring (human only, gated by isMyTurn) ----
+document.getElementById('btnEndTurn').onclick=function(){ if(!isMyTurn()) return; withState(endTurnAction); };
+document.getElementById('btnHunt').onclick=function(){ if(!isMyTurn()) return; withState(huntAction); };
+document.getElementById('btnTrain').onclick=function(){ if(!isMyTurn()) return; withState(trainAction); };
+document.getElementById('btnRaid').onclick=function(){ if(!isMyTurn()) return; withState(raidAction); };
+document.getElementById('btnTransmute').onclick=function(){ if(!isMyTurn()) return; withState(transmuteAction); };
+document.getElementById('btnAscend').onclick=function(){ if(!isMyTurn()) return; withState(ascendAction); };
+
+document.getElementById('btnTradeToggle').onclick=function(){ document.getElementById('tradePanel').classList.toggle('show'); document.getElementById('sabotagePanel').classList.remove('show'); refreshTargetSelects(); };
+document.getElementById('btnCancelTrade').onclick=function(){ document.getElementById('tradePanel').classList.remove('show'); };
+document.getElementById('btnSendTrade').onclick=function(){
+  if(!isMyTurn()) return;
+  const targetIdx=parseInt(document.getElementById('tradeTarget').value,10);
+  const giveMat=document.getElementById('tradeGiveMat').value;
+  const giveQty=parseInt(document.getElementById('tradeGiveQty').value||'0',10);
+  const wantMat=document.getElementById('tradeWantMat').value;
+  const wantQty=parseInt(document.getElementById('tradeWantQty').value||'0',10);
+  withState(function(){
+    const g=me();
+    if(!giveMat || (g.mat[giveMat]||0)<giveQty){ addLog(g.name+' does not have enough to offer that trade.'); return; }
+    state.pendingTrade={ from: state.current, to: targetIdx, giveMat: giveMat, giveQty: giveQty, wantMat: wantMat, wantQty: wantQty };
+    addLog(g.name+' proposes a trade to '+state.guilds[targetIdx].name+'.', 'ev');
+  });
+  document.getElementById('tradePanel').classList.remove('show');
+};
+
+document.getElementById('btnSabotageToggle').onclick=function(){ document.getElementById('sabotagePanel').classList.toggle('show'); document.getElementById('tradePanel').classList.remove('show'); refreshTargetSelects(); };
+document.getElementById('btnCancelSabotage').onclick=function(){ document.getElementById('sabotagePanel').classList.remove('show'); };
+document.getElementById('btnSendSabotage').onclick=function(){
+  if(!isMyTurn()) return;
+  const targetIdx=parseInt(document.getElementById('sabTarget').value,10);
+  const payMat=document.getElementById('sabMat').value;
+  withState(function(){
+    const g=me();
+    if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
+    if(!payMat || (g.mat[payMat]||0)<1){ addLog(g.name+' has no material to spend on a curse.'); return; }
+    g.mat[payMat]-=1; if(g.mat[payMat]===0) delete g.mat[payMat];
+    g.ap-=1;
+    state.guilds[targetIdx].hexCurse=true;
+    addLog(g.name+' spends 1 '+payMat+' to curse '+state.guilds[targetIdx].name+': their next Hunt total takes -2.', 'ev');
+  });
+  document.getElementById('sabotagePanel').classList.remove('show');
+};
+
+document.getElementById('btnBlacksmithToggle').onclick=function(){
+  document.getElementById('blacksmithPanel').classList.toggle('show');
+  document.getElementById('tradePanel').classList.remove('show');
+  document.getElementById('sabotagePanel').classList.remove('show');
+  populateBlacksmith();
+};
+document.getElementById('btnCancelBlacksmith').onclick=function(){ document.getElementById('blacksmithPanel').classList.remove('show'); };
+document.getElementById('blacksmithItem').onchange=updateBlacksmithCost;
+document.getElementById('btnCraftItem').onclick=function(){
+  if(!isMyTurn()) return;
+  const item=document.getElementById('blacksmithItem').value;
+  if(!item) return;
+  withState(function(){ craftAction(item); });
+};
+function populateBlacksmith(){
+  const g=me();
+  const sel=document.getElementById('blacksmithItem');
+  const options=eligibleGear(g);
+  if(!options.length){
+    sel.innerHTML='<option value="">Nothing craftable right now</option>';
+    document.getElementById('btnCraftItem').disabled=true;
+  } else {
+    sel.innerHTML=options.map(function(name){ return '<option value="'+name+'">'+(GEAR_ICON[name]||'')+' '+name+'</option>'; }).join('');
+    document.getElementById('btnCraftItem').disabled=false;
+  }
+  updateBlacksmithCost();
+}
+function updateBlacksmithCost(){
+  const sel=document.getElementById('blacksmithItem');
+  const def=GEAR[sel.value];
+  const costEl=document.getElementById('blacksmithCost');
+  if(!def){ costEl.textContent='Full item slots or no owned base gear to upgrade.'; return; }
+  const costStr=Object.keys(def.cost).map(function(k){ return def.cost[k]+' '+k; }).join(' + ');
+  costEl.textContent=costStr+' — '+def.desc;
+}
+
+// ---- AI bot driver ----
+// In an online room, only the host device (myGuildIndex===0) drives bot turns, so two devices never race to act for the same bot.
+function isBotDriver(){ return LOCAL_MODE || myGuildIndex===0; }
+
+function maybeBotContinue(){
+  if(!state || !isBotDriver()) return;
+  if(state.pendingTrade){
+    const target=state.guilds[state.pendingTrade.to];
+    if(target && target.isBot && !botTradeScheduled){
+      botTradeScheduled=true;
+      setTimeout(function(){ botTradeScheduled=false; withState(function(){ resolveBotTrade(); }); }, 600);
+    }
+  }
+  if(botStepScheduled) return;
+  if(state.winner!==null && state.winner!==undefined) return;
+  const g=me();
+  if(!g || !g.isBot) return;
+  botStepScheduled=true;
+  setTimeout(function(){ botStepScheduled=false; botStep(); }, 700);
+}
+
+function resolveBotTrade(){
+  const p=state.pendingTrade;
+  if(!p) return;
+  const toG=state.guilds[p.to];
+  if(!toG || !toG.isBot) return;
+  const canAfford=(toG.mat[p.wantMat]||0)>=p.wantQty;
+  const accept = canAfford && Math.random()<0.7;
+  resolveTrade(accept);
+}
+
+function botStep(){
+  if(!state) return;
+  if(state.winner!==null && state.winner!==undefined) return;
+  const g=me();
+  if(!g.isBot) return;
+  if(g.ap<=0){ withState(endTurnAction); return; }
+  const f=floors[g.idx];
+  if(g.progress>=f.need && (g.mat[f.name]||0)>=f.toll){ withState(ascendAction); return; }
+  if((g.gear||[]).length<2){
+    const options=eligibleGear(g).filter(function(name){ return GEAR[name].type==='weapon'; });
+    const craftable=options.find(function(name){ return affordGear(g,GEAR[name].cost); });
+    if(craftable){ withState(function(){ craftAction(craftable); }); return; }
+  }
+  if((g.mat[f.name]||0)>=2 && Math.random()<0.5){ withState(trainAction); return; }
+  if(Math.random()<0.15 && others().some(function(o){return stockKeys(o.g).length;})){ withState(raidAction); return; }
+  withState(huntAction);
+}
+</script>
+</body>
+</html>
