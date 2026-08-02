@@ -1,4 +1,4 @@
-﻿import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, off, set, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
 const firebaseConfig = {
@@ -39,9 +39,8 @@ const LOOT_DECK=['mat','mat','mat','mat','mat','mat','mat','mat','mat','mat','br
 const PALETTE=['#4fd8ff','#a480ff','#e0b756','#ff8b7a'];
 const FLOOR_TINT=['#4fd8ff','#5de0c8','#a480ff','#d97fe0','#e0b756','#ff8b7a'];
 const FLOOR_RANK=['E','D','C','B','A','S'];
-// the team's drawings, one per floor, in art/. see the .art class in style.css.
-// mon 1-6 are Temple Serpant, crystal golem, Minotaur, Bone Oracle, Ash Drake, Tower Guardian;
-// mat 1-6 are the snake's tooth, resonant crystal, cursed bone, ancient wood, dragon scale, astral core.
+// floor 1-6 art: mon = Temple Serpant, crystal golem, Minotaur, Bone Oracle, Ash Drake, Tower Guardian.
+// mat = snake's tooth, resonant crystal, cursed bone, ancient wood, dragon scale, astral core.
 function art(kind, n){ return 'url(art/'+kind+'/'+n+'.png)'; }
 const COLOR_OPTIONS=[
   {color:'#4fd8ff', name:'Azure'},
@@ -451,7 +450,6 @@ async function withState(fn){
 
 function render(){
   if(!state) return;
-  // the floor's own numbers live on the board tile now, no duplicate card here
   const pool=state.pools[me().idx];
   const f=floors[me().idx];
 
@@ -503,7 +501,6 @@ function render(){
     document.getElementById('winBanner').style.display='none';
   }
 
-  // an action you cannot pay for is greyed out, so the board answers "what can I do" on its own
   const canAct = isMyTurn() && !won && !me().isBot;
   const g0=me(), hasAP = canAct && g0.ap>0;
   const dis={
@@ -523,7 +520,6 @@ function render(){
   document.getElementById('log').innerHTML = (state.log||[]).map(function(l){return '<div class="'+(l.cls||'')+'">'+l.t+'</div>';}).join('');
 
   document.getElementById('headerAvatars').innerHTML = state.guilds.map(function(g,i){
-    // the crest replaces the initial, which was a "G" on every chip anyway
     return '<div class="avatarChip art ink'+(i===state.current&&!won?' turn':'')+'" style="background:'+g.color+'; --art:'+art('guild',i+1)+'" title="'+g.name+'"></div>';
   }).join('');
 
@@ -555,7 +551,6 @@ function renderOutbreakBadge(){
     '<div class="obCount">'+Math.max(0,t)+'</div>';
 }
 
-// what your player board held last time it was drawn, for the drop-in animation
 const prevMats={};
 let prevGear=[];
 
@@ -587,7 +582,6 @@ function renderPlacemat(){
   prevGear=gear.slice();
   if(matChips.concat(gearChips).some(function(c){ return c.indexOf('fresh')>=0; })) SFX.gain();
 
-  // draw the unused slots too, so the storage cap is visible like a printed player board
   function pad(chips, slots){
     const out=chips.slice();
     while(out.length<slots) out.push('<div class="slotEmpty">empty</div>');
@@ -599,11 +593,9 @@ function renderPlacemat(){
   document.getElementById('placematGear').innerHTML = pad(gearChips, GEAR_SLOTS);
 }
 
-// which platform and step each pawn was standing on last time the tower was drawn
 const pawnAt={};
 const PLAT_TILT=50;
 
-// a pawn that changed step walks along its platform; one that changed floor drops onto the new one
 function movePawns(){
   document.querySelectorAll('#towerList .stand').forEach(function(st){
     const gi=parseInt(st.dataset.g,10);
@@ -633,7 +625,6 @@ function renderTower(){
     const here=state.guilds.filter(function(g){return g.idx===i;});
     const hereNow=here.some(function(g){return state.guilds.indexOf(g)===state.current;});
 
-    // the path across the platform: a guild standing on step s has s ascension progress
     let track='';
     for(let s=0;s<=fl.need;s++){
       const onStep=here.filter(function(g){ return Math.min(g.progress, fl.need)===s; });
@@ -642,7 +633,6 @@ function renderTower(){
         return '<span class="stand" data-g="'+gi+'"><span class="pawn'+(gi===state.current?' turnNow':'')+'" style="color:'+g.color+'" title="'+g.name+', '+g.progress+'/'+fl.need+' progress"></span></span>';
       }).join('')+'</span>';
     }
-    // a floor that also charges a Key shows the Key at its gate instead of the toll gatepost
     const gk=KEYS[i];
     const gic=gk
       ? '<span class="gic art" style="--art:'+art('key',gk.art)+'"></span>'
@@ -675,7 +665,6 @@ function renderTower(){
     );
   }
   list.innerHTML=rows.join('');
-  // the camera rides with whoever is playing, so climbing actually feels like climbing
   list.style.transform='rotateX('+PLAT_TILT+'deg) translate3d(0,'+(cam*182)+'px,'+(-cam*20)+'px)';
   movePawns();
 }
@@ -687,7 +676,6 @@ function popAnimate(el){
   el.classList.add('pop');
 }
 
-// physical die face: which of the 9 grid cells carry a pip
 const PIP_MAP={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 function pipCells(n){
   const on=PIP_MAP[n]||[];
@@ -700,7 +688,6 @@ function diceFace(n, cls, id){
 }
 function setFace(el,n){ el.innerHTML=pipCells(n); el.title=n; }
 
-// a die is thrown: it tumbles, the face keeps changing, then it settles
 let lastRollKey=null;
 function throwDie(el, finalN){
   if(!el) return;
@@ -710,6 +697,15 @@ function throwDie(el, finalN){
     setFace(el, 1+Math.floor(Math.random()*6));
     if(++ticks>=6){ clearInterval(iv); setFace(el, finalN); }
   }, 65);
+}
+
+function lootCard(loot){
+  if(!loot) return '';
+  const face = loot.kind==='mat'
+    ? '<span class="lootArt art" style="--art:'+art('mat',loot.floor+1)+'"></span>'
+    : '<span class="lootArt broken">&#x1FA93;</span>';
+  const tint = loot.kind==='mat' ? FLOOR_TINT[loot.floor] : 'var(--coral)';
+  return '<div class="lootCard" style="--tint:'+tint+'"><span class="lootTag">Loot</span>'+face+'<span class="lootName">'+loot.name+'</span></div>';
 }
 
 function renderDice(){
@@ -732,7 +728,8 @@ function renderDice(){
     '<p style="font-size:11.5px;color:var(--text-mid);margin:0 0 4px;">'+h.guildName+' hunts '+h.matName+'</p>'+
     '<div class="diceRow">'+diceFace(h.d1,'','dc1')+'<span class="plus">+</span>'+diceFace(h.d2,'','dc2')+'</div>'+
     (h.snake ? '<p style="font-size:12px;color:var(--text-dim);">snake eyes</p>' : '<p style="font-size:12px;color:var(--text-dim);">total '+h.total+' vs DR '+h.dr+'</p>')+
-    '<p class="resultLine '+resultCls+'">'+resultText+'</p>';
+    '<p class="resultLine '+resultCls+'">'+resultText+'</p>'+
+    lootCard(h.loot);
   const key = (h.seq!==undefined ? h.seq : (h.guildName+'|'+h.d1+'|'+h.d2+'|'+h.total));
   if(key!==lastRollKey){
     lastRollKey=key;
@@ -898,9 +895,9 @@ function drawLoot(g){
   }
   const card=state.loot.pop();
   g.gear=g.gear||[];
-  if(card==='broken' && g.gear.length<GEAR_SLOTS){ g.gear.push('Broken Gear'); return 'a piece of Broken Gear'; }
+  if(card==='broken' && g.gear.length<GEAR_SLOTS){ g.gear.push('Broken Gear'); return {kind:'broken', name:'Broken Gear', label:'a piece of Broken Gear'}; }
   const f=floors[g.idx];
-  if(state.pools[g.idx]>0 && addMat(g,f.name,1)){ state.pools[g.idx]-=1; return '1 '+f.name; }
+  if(state.pools[g.idx]>0 && addMat(g,f.name,1)){ state.pools[g.idx]-=1; return {kind:'mat', floor:g.idx, name:f.name, label:'1 '+f.name}; }
   return null;
 }
 
@@ -956,7 +953,7 @@ function huntAction(){
 
   function successExtras(){
     let extra='';
-    if(hasCoin){ const bonus=drawLoot(g); if(bonus) extra+=' Lucky Coin: +'+bonus+'.'; }
+    if(hasCoin){ const bonus=drawLoot(g); if(bonus){ extra+=' Lucky Coin: +'+bonus.label+'.'; hunt.loot=hunt.loot||bonus; } }
     if(hasCompass){ g.progress+=1; extra+=' Compass: +1 extra progress.'; }
     return extra;
   }
@@ -965,8 +962,8 @@ function huntAction(){
     g.progress+=2;
     const loot=drawLoot(g);
     g.ap+=1;
-    hunt.crit=true; hunt.success=true;
-    addLog(g.name+' rolls double sixes! Critical hunt: +2 progress'+(loot?', loot: '+loot:'')+', action point refunded.'+gearNote+successExtras());
+    hunt.crit=true; hunt.success=true; hunt.loot=loot;
+    addLog(g.name+' rolls double sixes! Critical hunt: +2 progress'+(loot?', loot: '+loot.label:'')+', action point refunded.'+gearNote+successExtras());
   } else if(d1===1&&d2===1){
     // section 5: a natural 2 is the only roll that costs banked progress
     hunt.snake=true; hunt.shielded=hasShield;
@@ -980,7 +977,8 @@ function huntAction(){
     g.progress+=1;
     hunt.success=true;
     const loot=drawLoot(g);
-    if(loot) addLog(g.name+' rolls '+total+(behind?' (+1 catch-up)':'')+(g.hexCurse?' (-2 cursed)':'')+gearNote+' vs DR'+f.dr+', success: +1 progress, loot: '+loot+'.'+successExtras());
+    hunt.loot=loot;
+    if(loot) addLog(g.name+' rolls '+total+(behind?' (+1 catch-up)':'')+(g.hexCurse?' (-2 cursed)':'')+gearNote+' vs DR'+f.dr+', success: +1 progress, loot: '+loot.label+'.'+successExtras());
     else addLog(g.name+' succeeds but storage is full or the pool is empty. Progress only.'+successExtras());
   } else {
     addLog(g.name+' rolls '+total+(behind?' (+1 catch-up)':'')+(g.hexCurse?' (-2 cursed)':'')+gearNote+' vs DR'+f.dr+', failed. Action point spent.');
