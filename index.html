@@ -44,7 +44,7 @@
     min-height: 100vh;
   }
   body.in-game {
-    max-width: 1180px;
+    max-width: 1320px;
     height: 100vh;
     min-height: 0;
     padding: 12px 18px;
@@ -145,22 +145,11 @@
 
   .turnBanner {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 12px 18px; margin-bottom: 14px; font-size: 14px; font-weight: 600;
+    padding: 9px 14px; margin-bottom: 14px; font-size: 13.5px; font-weight: 600;
   }
   .turnBanner .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; box-shadow: 0 0 8px currentColor; }
   .turnBanner .hint { font-weight: 400; color: var(--text-mid); font-size: 12px; }
 
-  .floorCard {
-    background: linear-gradient(180deg, var(--parchment), #e6d8b5);
-    color: var(--parchment-ink);
-    border: 1px solid #b8a473;
-    border-radius: 10px;
-    padding: 16px 18px;
-    margin-bottom: 14px;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.35);
-  }
-  .floorCard h2 { font-family: 'Cinzel', serif; font-size: 16px; margin: 0 0 4px; }
-  .floorCard p { font-size: 12.5px; margin: 0; opacity: 0.85; }
 
   .arena {
     display: flex;
@@ -171,7 +160,7 @@
   .guildPanel { padding: 12px 14px; border-left: 3px solid var(--border-glow); }
   .guildPanel h3 { font-family: 'Cinzel', serif; font-size: 13.5px; margin: 0 0 8px; display:flex; align-items:center; gap:6px; }
   .guildPanel .miniStats { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; margin-bottom: 8px; }
-  .guildPanel .miniStat { background: rgba(255,255,255,0.03); border-radius: 6px; padding: 6px 8px; }
+  .guildPanel .miniStat { background: rgba(255,255,255,0.03); border-radius: 6px; padding: 4px 8px; }
   .guildPanel .miniStat .l { font-size: 10px; color: var(--text-dim); }
   .guildPanel .miniStat .v { font-size: 14px; font-weight: 600; color: var(--text-hi); }
   .guildPanel p.line { font-size: 11.5px; color: var(--text-mid); margin: 3px 0; }
@@ -197,12 +186,20 @@
 
   body.in-game #game { flex: 1; min-height: 0; display: flex; flex-direction: column; }
   body.in-game .gameHead { flex: 0 0 auto; margin-bottom: 8px; }
+  /* the board sits in the middle of the table, biggest thing on screen */
   body.in-game .layout {
     flex: 1; min-height: 0; align-items: stretch;
-    grid-template-columns: 260px 1fr 240px;
+    grid-template-columns: minmax(280px, 1fr) minmax(330px, 1.15fr) 215px;
   }
-  @media (max-width: 1100px) { body.in-game .layout { grid-template-columns: 220px 1fr 200px; } }
-  @media (max-width: 900px) { body.in-game .layout { grid-template-columns: 1fr; } body.in-game .mainCol, body.in-game .towerPanel, body.in-game .logPanel { max-height: none; } }
+  body.in-game .mainCol { order: 1; }
+  body.in-game .towerPanel { order: 2; }
+  body.in-game .logPanel { order: 3; }
+  @media (max-width: 1100px) { body.in-game .layout { grid-template-columns: 1fr 1fr 190px; } }
+  @media (max-width: 900px) {
+    body.in-game .layout { grid-template-columns: 1fr; }
+    body.in-game .towerPanel { order: 0; }
+    body.in-game .mainCol, body.in-game .towerPanel, body.in-game .logPanel { max-height: none; }
+  }
   body.in-game .towerPanel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
   body.in-game .towerPanel #towerList { flex: 1; min-height: 0; overflow-y: auto; padding-right: 6px; }
   body.in-game .mainCol { min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
@@ -210,7 +207,7 @@
   body.in-game .logPanel #log { flex: 1; min-height: 0; overflow-y: auto; padding-right: 4px; }
   body.in-game .towerPanel { padding: 16px 16px; }
   body.in-game .towerPanel h3 { margin-bottom: 10px; }
-  body.in-game .turnBanner, body.in-game .floorCard, body.in-game .arena,
+  body.in-game .turnBanner, body.in-game .arena,
   body.in-game .placemat, body.in-game .ascendRow, body.in-game #diceReveal { margin-bottom: 8px; }
   body.in-game .actionBar { margin-bottom: 8px; }
   body.in-game button.act.end { margin-bottom: 8px; }
@@ -247,7 +244,7 @@
   @keyframes pulseWarn { 0%,100%{ box-shadow: 0 0 6px rgba(255,80,60,0.25);} 50%{ box-shadow: 0 0 16px rgba(255,80,60,0.55);} }
   /* one floor = one printed cardboard space, colour-banded on its left edge */
   .floorRow {
-    position: relative; margin-bottom: 17px; padding: 9px 11px 8px 13px; border-radius: 5px;
+    position: relative; margin-bottom: 13px; padding: 6px 9px 6px 11px; border-radius: 5px;
     color: var(--parchment-ink);
     background:
       linear-gradient(180deg, rgba(255,255,255,0.30), rgba(0,0,0,0.05)),
@@ -259,47 +256,50 @@
   .floorRow.hereNow { box-shadow: 0 0 0 2px var(--gold), 0 3px 0 rgba(0,0,0,0.45), 0 8px 18px rgba(0,0,0,0.5); }
   /* dashed climbing path linking one space to the next */
   .floorRow:not(:last-child)::after {
-    content:''; position:absolute; left:24px; bottom:-17px; height:17px; width:0;
+    content:''; position:absolute; left:22px; bottom:-13px; height:13px; width:0;
     border-left: 3px dashed rgba(224,183,86,0.6);
   }
-  .floorRow .frTop { display:flex; justify-content:space-between; align-items:center; font-size: 10px; color: var(--parchment-ink-2); margin-bottom: 5px; text-transform:uppercase; letter-spacing:0.5px; }
+  /* one compact header line per space: number, monster, name, difficulty */
+  .floorRow .frHead { display:flex; align-items:center; gap:7px; margin-bottom: 3px; }
   .floorRow .frNum {
-    display:flex; align-items:center; justify-content:center; width:21px; height:21px; border-radius:50%;
-    font-family:'Cinzel',serif; font-weight:700; font-size:11.5px; color:#2b2115; letter-spacing:0;
+    display:flex; align-items:center; justify-content:center; width:20px; height:20px; border-radius:50%; flex:0 0 auto;
+    font-family:'Cinzel',serif; font-weight:700; font-size:11px; color:#2b2115;
     background: var(--tint, #c9b68b); box-shadow: inset 0 -2px 0 rgba(0,0,0,0.22), 0 1px 2px rgba(0,0,0,0.3);
   }
-  .floorRow .frName { font-family:'Cinzel',serif; font-size: 14.5px; font-weight:700; color: var(--parchment-ink); margin: 0 0 3px; gap:8px; }
-  .floorRow .frName .frIcon { font-size: 22px; filter: drop-shadow(0 1px 1px rgba(0,0,0,0.35)); }
-  .floorRow .frMeta { font-size: 10.5px; color: var(--parchment-ink-2); margin-bottom: 6px; }
+  .floorRow .frName { font-family:'Cinzel',serif; font-size: 13.5px; font-weight:700; color: var(--parchment-ink); flex:1; min-width:0; }
+  .floorRow .frDR { font-size: 9.5px; letter-spacing:0.5px; text-transform:uppercase; color: var(--parchment-ink-2); flex:0 0 auto; }
   /* the recessed area of the space where the pawns actually stand */
   .floorRow .frMarkers {
-    display:flex; flex-wrap:wrap; gap:9px; align-items:flex-end; min-height:32px;
-    margin: 6px 0; padding: 4px 9px 3px; border-radius: 4px;
+    display:flex; flex-wrap:wrap; gap:9px; align-items:flex-end; min-height:26px;
+    margin: 4px 0 3px; padding: 3px 8px 2px; border-radius: 4px;
     background: rgba(80,60,30,0.10); box-shadow: inset 0 1px 3px rgba(0,0,0,0.22);
   }
   /* guild pawn: head + tapered body + table shadow, coloured by currentColor */
-  .pawn { position:relative; width:17px; height:24px; flex:0 0 auto; filter: drop-shadow(1px 2px 1.5px rgba(0,0,0,0.45)); }
+  .pawn { position:relative; width:21px; height:29px; flex:0 0 auto; filter: drop-shadow(1px 2px 1.5px rgba(0,0,0,0.45)); }
   .pawn::before {
-    content:''; position:absolute; top:0; left:50%; margin-left:-5.5px; width:11px; height:11px; border-radius:50%;
+    content:''; position:absolute; top:0; left:50%; margin-left:-6.5px; width:13px; height:13px; border-radius:50%;
     background: currentColor; box-shadow: inset -2px -2px 0 rgba(0,0,0,0.22), inset 2px 2px 0 rgba(255,255,255,0.30);
   }
   .pawn::after {
-    content:''; position:absolute; bottom:0; left:0; width:17px; height:16px; background: currentColor;
+    content:''; position:absolute; bottom:0; left:0; width:21px; height:19px; background: currentColor;
     clip-path: polygon(50% 0, 68% 22%, 78% 60%, 100% 100%, 0 100%, 22% 60%, 32% 22%);
     box-shadow: inset -4px -3px 0 rgba(0,0,0,0.20);
   }
-  .pipTrack { display:flex; align-items:center; gap:6px; margin-top:5px; }
+  /* each guild's ascension track, printed on the space it stands on */
+  .pipTrack { display:flex; align-items:center; gap:5px; margin-top:3px; }
   .pipTrack .pips { display:flex; flex-wrap:wrap; gap:3px; }
-  .pipTrack .pip { width:11px; height:11px; border-radius:3px; background: rgba(80,60,30,0.16); box-shadow: inset 0 1px 2px rgba(0,0,0,0.22); }
+  .pipTrack .pip { width:10px; height:10px; border-radius:3px; background: rgba(80,60,30,0.16); box-shadow: inset 0 1px 2px rgba(0,0,0,0.22); }
   .pipTrack .pip.filled { background: currentColor; box-shadow: inset 0 -2px 0 rgba(0,0,0,0.22); }
-  .pipTrack .pipLabel { font-size: 9.5px; color: var(--parchment-ink-2); white-space:nowrap; margin-left:2px; }
-  .poolTrack { display:flex; align-items:center; gap:6px; margin-top:8px; padding-top:7px; border-top: 1px dashed rgba(80,60,30,0.3); }
-  .poolTrack .pips { display:flex; gap:2px; flex:1; }
-  .poolTrack .pip { flex:1; height:8px; border-radius:2px; background: rgba(80,60,30,0.16); }
-  .poolTrack .pip.filled { background: #a97d2b; box-shadow: inset 0 -1px 0 rgba(0,0,0,0.25); }
-  .poolTrack .poolLabel { font-size: 9.5px; color: var(--parchment-ink-2); white-space:nowrap; }
+  .pipTrack .pipLabel { font-size: 9px; color: var(--parchment-ink-2); white-space:nowrap; margin-left:2px; }
+  /* toll on the left, what is left of the floor's resource pool on the right */
+  .frFoot { display:flex; align-items:center; gap:6px; margin-top:5px; padding-top:5px; border-top: 1px dashed rgba(80,60,30,0.3); }
+  .frFoot .frToll { font-size: 9px; letter-spacing:0.5px; text-transform:uppercase; color: var(--parchment-ink-2); white-space:nowrap; }
+  .frFoot .pips { display:flex; gap:2px; flex:1; }
+  .frFoot .pip { flex:1; height:7px; border-radius:2px; background: rgba(80,60,30,0.16); }
+  .frFoot .pip.filled { background: #a97d2b; box-shadow: inset 0 -1px 0 rgba(0,0,0,0.25); }
+  .frFoot .poolLabel { font-size: 9px; color: var(--parchment-ink-2); white-space:nowrap; }
 
-  #diceReveal { display:block; padding: 14px 16px; margin-bottom: 14px; text-align:center; min-height: 92px; }
+  #diceReveal { display:block; padding: 9px 12px; margin-bottom: 14px; text-align:center; }
   #diceReveal .placeholder { font-size: 12.5px; color: var(--text-dim); padding: 20px 0; }
   .diceRow { display:flex; align-items:center; justify-content:center; gap: 10px; margin: 6px 0; }
   /* real dice faces: 3x3 pip grid, not a printed number */
@@ -313,7 +313,7 @@
   .diceCube i.on { background: radial-gradient(circle at 34% 30%, #4d443a, #17140f); box-shadow: inset 0 -1px 1px rgba(255,255,255,0.25); }
   .diceRow .plus { color: var(--text-mid); font-size: 16px; }
   .diceCube.idle { background: linear-gradient(150deg,#5c5344,#38322a); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
-  .diceCube.idle i.on { background: rgba(255,255,255,0.16); box-shadow: none; }
+  .diceCube.idle i.on { background: rgba(255,247,225,0.30); box-shadow: none; }
   @keyframes dicePop { 0%{ transform: scale(0.4) rotate(-8deg); opacity:0; } 60%{ transform: scale(1.08) rotate(3deg); opacity:1; } 100%{ transform: scale(1) rotate(0); } }
   .diceCube.pop { animation: dicePop 0.35s ease-out; }
   #diceReveal .resultLine { font-size: 13.5px; font-weight:600; margin-top: 6px; }
@@ -327,7 +327,7 @@
   button.act {
     background: var(--panel); color: var(--text-hi);
     border: 1px solid var(--border-glow); border-radius: 9px;
-    padding: 10px 10px; font-size: 12.5px; cursor: pointer; font-family: 'Inter', sans-serif;
+    padding: 8px 9px; font-size: 12.5px; cursor: pointer; font-family: 'Inter', sans-serif;
     display:flex; flex-direction:column; align-items:center; text-align:center; gap:3px;
   }
   button.act .lbl { font-size: 12.5px; font-weight:600; }
@@ -343,7 +343,7 @@
   .ascendRow { margin-bottom: 10px; }
   button.act.ascend {
     width: 100%; flex-direction: row; justify-content: center; gap: 12px;
-    padding: 15px 16px; border: 1px solid var(--gold);
+    padding: 11px 14px; border: 1px solid var(--gold);
     background: linear-gradient(135deg, rgba(224,183,86,0.18), rgba(224,183,86,0.05));
     box-shadow: 0 0 16px rgba(224,183,86,0.18);
   }
@@ -354,7 +354,7 @@
 
   /* personal player board with printed, countable slots */
   .placemat {
-    display: none; margin-bottom: 14px; padding: 16px 18px; border-radius: 14px;
+    display: none; margin-bottom: 14px; padding: 11px 14px; border-radius: 14px;
     background:
       repeating-linear-gradient(93deg, rgba(0,0,0,0.12) 0 3px, rgba(255,255,255,0.02) 3px 9px),
       linear-gradient(160deg, #3d2c1d, #241a12);
@@ -364,7 +364,7 @@
   .placemat.show { display: block; }
   .placemat h4 {
     font-family: 'Cinzel', serif; font-size: 13px; letter-spacing: 1.5px; text-transform: uppercase;
-    color: var(--gold); margin: 0 0 16px; text-align: center;
+    color: var(--gold); margin: 0 0 9px; text-align: center;
   }
   .placematCols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
   .placematCol { min-width: 0; }
@@ -443,7 +443,53 @@
   .avatarChip.turn { border-color: var(--gold); }
 
   .towerPanel h3 .cic { margin-right:4px; }
-  .floorRow .frName { display:flex; align-items:center; gap:5px; }
+
+  /* ---------- the board as an object: battlements, medallions, motion ---------- */
+
+  /* crenellated top on the highest space, so the stack reads as a tower */
+  #towerList .floorRow:first-child { margin-top: 15px; }
+  #towerList .floorRow:first-child::before {
+    content:''; position:absolute; left:-1px; right:-1px; top:-15px; height:15px;
+    background:
+      linear-gradient(180deg, transparent 0 8px, #b39c69 8px 15px),
+      repeating-linear-gradient(90deg, #c3ab74 0 15px, transparent 15px 27px);
+    border-radius: 3px 3px 0 0;
+    filter: drop-shadow(0 2px 1px rgba(0,0,0,0.45));
+  }
+
+  /* each floor's monster printed as an embossed medallion */
+  .floorRow .frIcon {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:27px; height:27px; border-radius:50%; font-size:15px; flex:0 0 auto;
+    background: radial-gradient(circle at 34% 28%, #fdf5df, #c6b087);
+    border: 1px solid #937b4c;
+    box-shadow: inset 0 -2px 4px rgba(0,0,0,0.25), inset 0 2px 3px rgba(255,255,255,0.6), 0 2px 3px rgba(0,0,0,0.35);
+  }
+
+  /* the guild whose turn it is keeps its pawn gently alive */
+  .pawn.turnNow { animation: pawnBob 1.7s ease-in-out infinite; }
+  @keyframes pawnBob { 0%,100%{ transform: translateY(0); } 50%{ transform: translateY(-3px); } }
+
+  /* dice are thrown, not printed */
+  .diceCube.rolling { animation: dieTumble 0.5s ease-out; }
+  @keyframes dieTumble {
+    0%   { transform: translateY(-30px) rotate(-160deg) scale(0.82); }
+    55%  { transform: translateY(5px) rotate(20deg) scale(1.06); }
+    78%  { transform: translateY(-4px) rotate(-7deg) scale(1); }
+    100% { transform: none; }
+  }
+
+  /* a progress cube being placed on the track */
+  .pipTrack .pip.justFilled { animation: pipPop 0.45s cubic-bezier(0.3,1.6,0.5,1); }
+  @keyframes pipPop { 0%{ transform: scale(0.2); } 60%{ transform: scale(1.5); } 100%{ transform: scale(1); } }
+
+  /* a token dropping onto your player board */
+  .matChip.fresh { animation: tokenDrop 0.42s cubic-bezier(0.3,1.4,0.5,1); }
+  @keyframes tokenDrop { 0%{ transform: translateY(-16px) scale(0.7); opacity:0; } 100%{ transform:none; opacity:1; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pawn.turnNow, .diceCube.rolling, .pipTrack .pip.justFilled, .matChip.fresh { animation: none; }
+  }
 </style>
 </head>
 <body>
@@ -549,11 +595,6 @@
       <div id="winBanner" class="glass" style="display:none; padding:12px 18px; margin-bottom:14px; color:var(--gold); font-weight:600;"></div>
       <div id="tradeOfferBanner" class="glass"></div>
       <div id="diceReveal" class="glass"></div>
-
-      <div class="floorCard">
-        <h2 id="floorTitle"></h2>
-        <p id="floorSub"></p>
-      </div>
 
       <div class="arena" id="arena"></div>
 
@@ -1002,6 +1043,7 @@ function addLog(t, cls){ state.log = state.log||[]; state.log.unshift({t:t, cls:
 function canAdd(g,name){ const mat=g.mat||{}; return mat.hasOwnProperty(name) || Object.keys(mat).length<CAP; }
 function addMat(g,name,qty){ if(!canAdd(g,name)) return false; g.mat=g.mat||{}; g.mat[name]=(g.mat[name]||0)+qty; return true; }
 function stockKeys(g){ const mat=g.mat||{}; return Object.keys(mat).filter(function(k){return mat[k]>0;}); }
+function matTotal(g){ let t=0; for(const k in (g.mat||{})) t+=g.mat[k]; return t; }
 function steal(from,to){ const keys=stockKeys(from); if(!keys.length) return null; const p=keys[Math.floor(Math.random()*keys.length)]; from.mat[p]-=1; if(from.mat[p]===0) delete from.mat[p]; return addMat(to,p,1)?p:null; }
 async function pushState(){ await set(roomRef(), state); }
 
@@ -1019,10 +1061,9 @@ async function withState(fn){
 
 function render(){
   if(!state) return;
+  // the floor's own numbers live on the board tile now, no duplicate card here
   const pool=state.pools[me().idx];
   const f=floors[me().idx];
-  document.getElementById('floorTitle').textContent='Floor '+(me().idx+1)+', '+f.name+', DR '+f.dr+'+';
-  document.getElementById('floorSub').textContent=(f.toll>0?('Toll to ascend: '+f.toll+' '+f.name):'Final floor, defeat the Sovereign to win')+'  ·  Pool left: '+pool;
 
   const arena=document.getElementById('arena');
   (function(){
@@ -1072,10 +1113,20 @@ function render(){
     document.getElementById('winBanner').style.display='none';
   }
 
+  // an action you cannot pay for is greyed out, so the board answers "what can I do" on its own
   const canAct = isMyTurn() && !won && !me().isBot;
-  ['btnHunt','btnTrain','btnRaid','btnTradeToggle','btnSabotageToggle','btnBlacksmithToggle','btnTransmute','btnAscend'].forEach(function(id){
-    document.getElementById(id).disabled = !canAct;
-  });
+  const g0=me(), hasAP = canAct && g0.ap>0;
+  const dis={
+    btnHunt: !hasAP,
+    btnTrain: !hasAP || (g0.mat[f.name]||0)<2,
+    btnRaid: !hasAP,
+    btnSabotageToggle: !hasAP || !stockKeys(g0).length,
+    btnTradeToggle: !canAct || !stockKeys(g0).length,
+    btnBlacksmithToggle: !canAct,
+    btnTransmute: !canAct || matTotal(g0)<f.tcost,
+    btnAscend: !canAct || g0.progress<f.need || (g0.mat[f.name]||0)<f.toll
+  };
+  Object.keys(dis).forEach(function(id){ document.getElementById(id).disabled = dis[id]; });
   document.getElementById('btnEndTurn').disabled = !canAct;
 
   document.getElementById('log').innerHTML = (state.log||[]).map(function(l){return '<div class="'+(l.cls||'')+'">'+l.t+'</div>';}).join('');
@@ -1110,6 +1161,10 @@ function renderOutbreakBadge(){
     '<div class="obCount">'+Math.max(0,t)+'</div>';
 }
 
+// what your player board held last time it was drawn, for the drop-in animation
+const prevMats={};
+let prevGear=[];
+
 function renderPlacemat(){
   const wrap=document.getElementById('myPlacemat');
   const show = isMyTurn() && !me().isBot && (state.winner===null || state.winner===undefined);
@@ -1122,12 +1177,18 @@ function renderPlacemat(){
   const matChips=keys.map(function(k){
     const fi=floors.findIndex(function(fl){return fl.name===k;});
     const ic=fi>=0?FLOOR_ICON[fi]:'&#x1F4E6;';
-    return '<div class="matChip"><span class="ic">'+ic+'</span><span>'+k+'</span><span class="qty">x'+g.mat[k]+'</span></div>';
+    const fresh=(g.mat[k]||0)>(prevMats[k]||0);   // a token you just gained drops in
+    return '<div class="matChip'+(fresh?' fresh':'')+'"><span class="ic">'+ic+'</span><span>'+k+'</span><span class="qty">x'+g.mat[k]+'</span></div>';
   });
+  Object.keys(prevMats).forEach(function(k){ delete prevMats[k]; });
+  keys.forEach(function(k){ prevMats[k]=g.mat[k]; });
+
   const gearChips=gear.map(function(name){
     const ic=GEAR_ICON[name]||'&#x1F392;';
-    return '<div class="matChip gear"><span class="ic">'+ic+'</span><span>'+name+'</span></div>';
+    const fresh=prevGear.indexOf(name)<0;
+    return '<div class="matChip gear'+(fresh?' fresh':'')+'"><span class="ic">'+ic+'</span><span>'+name+'</span></div>';
   });
+  prevGear=gear.slice();
 
   // draw the unused slots too, so the storage cap is visible like a printed player board
   function pad(chips, slots){
@@ -1141,8 +1202,41 @@ function renderPlacemat(){
   document.getElementById('placematGear').innerHTML = pad(gearChips, GEAR_SLOTS);
 }
 
+// progress each guild showed on the board last time it was drawn, so a newly
+// placed cube can be popped in instead of just appearing
+const prevProgress={};
+
+// FLIP: pawns keep their screen position across a re-render and slide to the new one
+function capturePawns(){
+  const seen={};
+  document.querySelectorAll('#towerList .pawn').forEach(function(p){
+    seen[p.dataset.g]=p.getBoundingClientRect();
+  });
+  return seen;
+}
+function animatePawns(before){
+  document.querySelectorAll('#towerList .pawn').forEach(function(p){
+    const from=before[p.dataset.g];
+    if(!from){
+      p.animate([{opacity:0, transform:'translateY(-10px) scale(0.6)'},{opacity:1, transform:'none'}],
+                {duration:260, easing:'ease-out'});
+      return;
+    }
+    const to=p.getBoundingClientRect();
+    const dx=from.left-to.left, dy=from.top-to.top;
+    if(Math.abs(dx)<1 && Math.abs(dy)<1) return;
+    // lifted arc, the way a hand picks a piece up and sets it down
+    p.animate([
+      {transform:'translate('+dx+'px,'+dy+'px)'},
+      {transform:'translate('+(dx/2)+'px,'+(dy/2-22)+'px) scale(1.18)', offset:0.55},
+      {transform:'none'}
+    ], {duration:560, easing:'cubic-bezier(0.34,1.1,0.5,1)'});
+  });
+}
+
 function renderTower(){
   const list=document.getElementById('towerList');
+  const before=capturePawns();
   const rows=[];
   for(let i=floors.length-1;i>=0;i--){
     const fl=floors[i];
@@ -1151,10 +1245,14 @@ function renderTower(){
     const tint=FLOOR_TINT[i];
 
     const pipRows=here.map(function(g){
+      const gi=state.guilds.indexOf(g);
       const filled=Math.min(g.progress, fl.need);
+      const grew=filled>(prevProgress[gi]||0);
+      prevProgress[gi]=filled;
       let pips='';
       for(let p=0;p<fl.need;p++){
-        pips+='<span class="pip'+(p<filled?' filled':'')+'"></span>';
+        const isNew = grew && p===filled-1;
+        pips+='<span class="pip'+(p<filled?' filled':'')+(isNew?' justFilled':'')+'"></span>';
       }
       return '<div class="pipTrack" style="color:'+g.color+'"><span class="pips">'+pips+'</span><span class="pipLabel">'+g.name.charAt(0).toUpperCase()+' '+g.progress+'/'+fl.need+'</span></div>';
     }).join('');
@@ -1168,17 +1266,26 @@ function renderTower(){
 
     rows.push(
       '<div class="floorRow'+(hereNow?' hereNow':'')+'" style="--tint:'+tint+';">'+
-        '<div class="frTop"><span class="frNum">'+(i+1)+'</span><span>DR '+fl.dr+'+</span></div>'+
-        '<div class="frName"><span class="frIcon">'+FLOOR_ICON[i]+'</span><span>'+fl.name+'</span></div>'+
-        '<div class="frMeta">'+(fl.toll>0?('Toll '+fl.toll+' '+fl.name):'Final floor — defeat the Sovereign')+'</div>'+
+        '<div class="frHead">'+
+          '<span class="frNum">'+(i+1)+'</span>'+
+          '<span class="frIcon" title="'+fl.name+'">'+FLOOR_ICON[i]+'</span>'+
+          '<span class="frName">'+fl.name+'</span>'+
+          '<span class="frDR">DR '+fl.dr+'+</span>'+
+        '</div>'+
         (here.length ? ('<div class="frMarkers">'+here.map(function(g){
-            return '<span class="pawn" style="color:'+g.color+'" title="'+g.name+', '+g.progress+'/'+fl.need+'"></span>';
-          }).join('')+'</div>'+pipRows) : '<div class="frMarkers"><span class="emptySpace">empty space</span></div>')+
-        '<div class="poolTrack"><span class="pips">'+poolPips+'</span><span class="poolLabel">pool '+poolLeft+'/'+poolTotal+'</span></div>'+
+            const gi=state.guilds.indexOf(g);
+            return '<span class="pawn'+(gi===state.current?' turnNow':'')+'" data-g="'+gi+'" style="color:'+g.color+'" title="'+g.name+', '+g.progress+'/'+fl.need+'"></span>';
+          }).join('')+'</div>'+pipRows) : '<div class="frMarkers"></div>')+
+        '<div class="frFoot">'+
+          '<span class="frToll">'+(fl.toll>0?('toll '+fl.toll):'boss floor')+'</span>'+
+          '<span class="pips">'+poolPips+'</span>'+
+          '<span class="poolLabel">'+poolLeft+'/'+poolTotal+'</span>'+
+        '</div>'+
       '</div>'
     );
   }
   list.innerHTML=rows.join('');
+  animatePawns(before);
 }
 
 function popAnimate(el){
@@ -1190,11 +1297,27 @@ function popAnimate(el){
 
 // physical die face: which of the 9 grid cells carry a pip
 const PIP_MAP={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
-function diceFace(n, cls, id){
+function pipCells(n){
   const on=PIP_MAP[n]||[];
   let cells='';
   for(let i=0;i<9;i++) cells+='<i'+(on.indexOf(i)>=0?' class="on"':'')+'></i>';
-  return '<div class="diceCube'+(cls?' '+cls:'')+'"'+(id?' id="'+id+'"':'')+' title="'+n+'">'+cells+'</div>';
+  return cells;
+}
+function diceFace(n, cls, id){
+  return '<div class="diceCube'+(cls?' '+cls:'')+'"'+(id?' id="'+id+'"':'')+' title="'+n+'">'+pipCells(n)+'</div>';
+}
+function setFace(el,n){ el.innerHTML=pipCells(n); el.title=n; }
+
+// a die is thrown: it tumbles, the face keeps changing, then it settles
+let lastRollKey=null;
+function throwDie(el, finalN){
+  if(!el) return;
+  el.classList.remove('rolling'); void el.offsetWidth; el.classList.add('rolling');
+  let ticks=0;
+  const iv=setInterval(function(){
+    setFace(el, 1+Math.floor(Math.random()*6));
+    if(++ticks>=6){ clearInterval(iv); setFace(el, finalN); }
+  }, 65);
 }
 
 function renderDice(){
@@ -1218,8 +1341,12 @@ function renderDice(){
     '<div class="diceRow">'+diceFace(h.d1,'','dc1')+'<span class="plus">+</span>'+diceFace(h.d2,'','dc2')+'</div>'+
     (h.snake ? '<p style="font-size:12px;color:var(--text-dim);">snake eyes</p>' : '<p style="font-size:12px;color:var(--text-dim);">total '+h.total+' vs DR '+h.dr+'</p>')+
     '<p class="resultLine '+resultCls+'">'+resultText+'</p>';
-  popAnimate(document.getElementById('dc1'));
-  popAnimate(document.getElementById('dc2'));
+  const key = (h.seq!==undefined ? h.seq : (h.guildName+'|'+h.d1+'|'+h.d2+'|'+h.total));
+  if(key!==lastRollKey){
+    lastRollKey=key;
+    throwDie(document.getElementById('dc1'), h.d1);
+    throwDie(document.getElementById('dc2'), h.d2);
+  }
 }
 
 function refreshTargetSelects(){
@@ -1364,7 +1491,8 @@ function huntAction(){
   const behind=trailing();
   let total=d1+d2+bowBonus+swordBonus+(behind?1:0)-(g.hexCurse?2:0);
   g.ap-=1;
-  const hunt={ guildName:g.name, matName:f.name, d1:d1, d2:d2, total:total, dr:f.dr, snake:false, crit:false, success:false, stolenFrom:null, gearNote:gearNote };
+  state.rollSeq=(state.rollSeq||0)+1;
+  const hunt={ seq:state.rollSeq, guildName:g.name, matName:f.name, d1:d1, d2:d2, total:total, dr:f.dr, snake:false, crit:false, success:false, stolenFrom:null, gearNote:gearNote };
 
   function successExtras(){
     let extra='';
@@ -1463,7 +1591,7 @@ function craftAction(itemName){
 }
 function transmuteAction(){
   const g=me(), f=floors[g.idx];
-  let total=0; for(const k in (g.mat||{})) total+=g.mat[k];
+  const total=matTotal(g);
   if(total>=f.tcost){
     let toSpend=f.tcost;
     for(const k of Object.keys(g.mat||{})){ if(toSpend<=0) break; const take=Math.min(g.mat[k],toSpend); g.mat[k]-=take; toSpend-=take; if(g.mat[k]===0) delete g.mat[k]; }
