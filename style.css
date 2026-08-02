@@ -116,6 +116,7 @@
     border: 1px solid var(--border-glow); background: var(--panel); color: var(--text-mid);
   }
   .colorOpt .ic { font-size: 22px; display:block; margin-bottom: 6px; }
+  .colorOpt .ic.art { width: 40px; height: 40px; margin: 0 auto 6px; --tint: currentColor; }
   .colorOpt .nm { font-family:'Cinzel',serif; font-weight:600; font-size: 13px; }
   .colorOpt.sel { border-color: #fff; box-shadow: 0 0 0 1px #fff, 0 0 16px currentColor; }
 
@@ -240,14 +241,24 @@
   .outbreakBadge.warn { background: rgba(255,80,60,0.16); border-color: #ff5a42; animation: pulseWarn 1.1s ease-in-out infinite; }
   .outbreakBadge.warn .obCount { color: #ff5a42; }
   @keyframes pulseWarn { 0%,100%{ box-shadow: 0 0 6px rgba(255,80,60,0.25);} 50%{ box-shadow: 0 0 16px rgba(255,80,60,0.55);} }
+  /* ---- the team's drawings ----
+     art/ holds line work drawn in black on transparent, so on this dark theme it has
+     to be inverted to white before it shows at all. one class covers every slot: put
+     .art on the element and hand it a --art url. it draws on ::before so the host
+     element keeps its own background and border un-inverted.
+     still on placeholders: .pawn (a square crest does not read as a standing piece),
+     #world backdrop, and gear icons, which are still emoji because the set only
+     covers sword, boomerang and lantern out of the eight the game crafts. */
+  .art { position: relative; }
+  .art::before {
+    content:''; position:absolute; inset:0;
+    background: center/contain no-repeat var(--art);
+    filter: invert(1) drop-shadow(0 0 4px var(--tint, var(--border-glow)));
+  }
+  /* on a solid bright chip the ink reads better left black */
+  .art.ink::before { filter: none; }
+
   /* one floor of the tower: a chamber you walk across before the gate opens */
-  /* ART SWAP POINTS. everything below is placeholder drawn in CSS. when the real
-     2D art arrives, these are the only four places it goes:
-       .pawn      guild piece      -> background image, drop the ::before/::after shape
-       .frIcon    monster portrait -> background image, drop the emoji
-       .plat      floor surface    -> background image on the platform
-       #world     backdrop         -> background image behind the tower
-     card faces would be new markup in the blacksmith and loot panels. */
 
   /* one floor = a lit platform in the tower, laid flat and receding into the distance */
   .plat {
@@ -261,6 +272,13 @@
     border: 1px solid rgba(255,255,255,0.10);
     box-shadow: 0 0 70px -20px var(--tint), inset 0 0 40px -20px var(--tint);
   }
+  /* the floor's monster is painted onto the platform itself, faint enough to walk over */
+  .plat::before {
+    content:''; position:absolute; inset:0; border-radius:16px; pointer-events:none;
+    background: left 14px center/auto 104% no-repeat var(--mon);
+    filter: invert(1); opacity: 0.17; transform: translateZ(-1px);
+  }
+  .plat.hereNow::before { opacity: 0.3; }
   /* floors already cleared fade behind you */
   .plat.past { opacity: 0.4; }
   .plat.hereNow { border-color: rgba(255,255,255,0.55); box-shadow: 0 0 90px -14px var(--tint), inset 0 0 0 1px rgba(255,255,255,0.25); }
@@ -284,6 +302,9 @@
     display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; flex:0 0 auto;
     font-size:17px; background: rgba(10,12,24,0.75); border: 1px solid rgba(255,255,255,0.18);
   }
+  /* the portrait is the same drawing as the platform behind it, so --mon inherits down */
+  .plat .frIcon.art { --art: var(--mon); }
+  .plat .frIcon.art::before { inset: 15%; }
   .plat .frName { font-family:'Cinzel',serif; font-size: 16px; font-weight:700; color: var(--text-hi); text-shadow: 0 0 12px var(--tint); }
   .plat .frDR { font-size: 10px; text-transform:uppercase; letter-spacing:0.5px; color: var(--text-mid); }
 
@@ -303,6 +324,8 @@
     font-size:9.5px; letter-spacing:0.5px; text-transform:uppercase; line-height:1.4;
   }
   .track .gate .gic { font-size:18px; }
+  /* floors 3, 5 and 6 charge a Floor Key on the way out, so the gate shows the key */
+  .track .gate .gic.art { width:22px; height:22px; }
   .track .gate.boss { border-style:solid; border-color: var(--coral); color: var(--coral); box-shadow: 0 0 20px -6px var(--coral); }
 
   /* a piece stands upright on its tile: the tile is flat, the pawn is not.
@@ -433,6 +456,8 @@
     border: 1px solid rgba(255,255,255,0.14); border-radius: 18px; padding: 5px 12px; font-size: 12.5px;
   }
   .matChip .ic { font-size: 15px; }
+  /* the Floor 1 tooth is drawn very tall and narrow, so the box is sized for that one */
+  .matChip .ic.art { flex: 0 0 auto; width: 22px; height: 24px; }
   .matChip .qty { font-weight: 700; color: var(--text-hi); }
   .matChip.empty { opacity: 0.55; font-style: italic; }
   .matChip.gear { border-color: rgba(79,216,255,0.45); }
@@ -492,6 +517,7 @@
   .avatarRow { display:flex; gap:6px; }
   .avatarChip { width:24px; height:24px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:10.5px; font-weight:700; color:#07070f; border:2px solid transparent; }
   .avatarChip.turn { border-color:#fff; }
+  .avatarChip.art::before { inset: 3px; }
 
   .towerPanel h3 .cic { margin-right:4px; }
   .floorRow .frName { display:flex; align-items:center; gap:5px; }

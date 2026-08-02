@@ -27,9 +27,9 @@ const floors=[
 // A Key is crafted and spent in the same instant, so it never occupies a mat slot.
 // The last one reaches back to Floor 1 on purpose: the leader needs a trailing Guild's material.
 const KEYS={
-  2: {name:"Vanguard's Sigil", cost:{'Kasaka Fang':1,'Golem Crystal':1}},
-  4: {name:'Kaisel Ward',      cost:{'Orc Tusk':1,'Oracle Wisp':1}},
-  5: {name:"Sovereign's Bane", cost:{'Kaisel Scale':1,'Kasaka Fang':1}}
+  2: {name:"Vanguard's Sigil", art:1, cost:{'Kasaka Fang':1,'Golem Crystal':1}},
+  4: {name:'Kaisel Ward',      art:2, cost:{'Orc Tusk':1,'Oracle Wisp':1}},
+  5: {name:"Sovereign's Bane", art:3, cost:{'Kaisel Scale':1,'Kasaka Fang':1}}
 };
 // section 11: 4 material slots and 2 item slots. section 8: 3 materials buy 1 of choice.
 // section 17: 12 rounds, then the highest climber wins.
@@ -39,12 +39,15 @@ const LOOT_DECK=['mat','mat','mat','mat','mat','mat','mat','mat','mat','mat','br
 const PALETTE=['#4fd8ff','#a480ff','#e0b756','#ff8b7a'];
 const FLOOR_TINT=['#4fd8ff','#5de0c8','#a480ff','#d97fe0','#e0b756','#ff8b7a'];
 const FLOOR_RANK=['E','D','C','B','A','S'];
-const FLOOR_ICON=['\u{1F40D}','\u{1F5FF}','\u{1F479}','\u{1F441}\u{FE0F}','\u{1F48E}','\u{1F409}'];
+// the team's drawings, one per floor, in art/. see the .art class in style.css.
+// mon 1-6 are Temple Serpant, crystal golem, Minotaur, Bone Oracle, Ash Drake, Tower Guardian;
+// mat 1-6 are the snake's tooth, resonant crystal, cursed bone, ancient wood, dragon scale, astral core.
+function art(kind, n){ return 'url(art/'+kind+'/'+n+'.png)'; }
 const COLOR_OPTIONS=[
-  {color:'#4fd8ff', name:'Azure', icon:'\u{1F30A}'},
-  {color:'#a480ff', name:'Amethyst', icon:'\u{1F52E}'},
-  {color:'#e0b756', name:'Amber', icon:'\u{1F3C6}'},
-  {color:'#ff8b7a', name:'Ember', icon:'\u{1F525}'}
+  {color:'#4fd8ff', name:'Azure'},
+  {color:'#a480ff', name:'Amethyst'},
+  {color:'#e0b756', name:'Amber'},
+  {color:'#ff8b7a', name:'Ember'}
 ];
 const GEAR={
   'Basic Bow':      { type:'weapon', line:'bow',   tier:1, cost:{'Kasaka Fang':2}, desc:'Reroll one die once, must accept the new sum.' },
@@ -149,7 +152,7 @@ COLOR_OPTIONS.forEach(function(opt,i){
   const b=document.createElement('div');
   b.className='colorOpt'+(i===0?' sel':'');
   b.style.color=opt.color;
-  b.innerHTML='<span class="ic">'+opt.icon+'</span><span class="nm">'+opt.name+'</span>';
+  b.innerHTML='<span class="ic art" style="--art:'+art('guild',i+1)+'"></span><span class="nm">'+opt.name+'</span>';
   b.onclick=function(){
     identityColorIdx=i;
     Array.from(colorGrid.children).forEach(function(c){c.classList.remove('sel');});
@@ -520,7 +523,8 @@ function render(){
   document.getElementById('log').innerHTML = (state.log||[]).map(function(l){return '<div class="'+(l.cls||'')+'">'+l.t+'</div>';}).join('');
 
   document.getElementById('headerAvatars').innerHTML = state.guilds.map(function(g,i){
-    return '<div class="avatarChip'+(i===state.current&&!won?' turn':'')+'" style="background:'+g.color+'" title="'+g.name+'">'+g.name.charAt(0).toUpperCase()+'</div>';
+    // the crest replaces the initial, which was a "G" on every chip anyway
+    return '<div class="avatarChip art ink'+(i===state.current&&!won?' turn':'')+'" style="background:'+g.color+'; --art:'+art('guild',i+1)+'" title="'+g.name+'"></div>';
   }).join('');
 
   document.getElementById('huntSub').textContent = '1 AP, 2d6 vs DR'+f.dr;
@@ -566,9 +570,11 @@ function renderPlacemat(){
 
   const matChips=keys.map(function(k){
     const fi=floors.findIndex(function(fl){return fl.name===k;});
-    const ic=fi>=0?FLOOR_ICON[fi]:'&#x1F4E6;';
+    const ic=fi>=0
+      ? '<span class="ic art" style="--art:'+art('mat',fi+1)+'; --tint:'+FLOOR_TINT[fi]+'"></span>'
+      : '<span class="ic">&#x1F4E6;</span>';
     const fresh=(g.mat[k]||0)>(prevMats[k]||0);   // a token you just gained drops in
-    return '<div class="matChip'+(fresh?' fresh':'')+'"><span class="ic">'+ic+'</span><span>'+k+'</span><span class="qty">x'+g.mat[k]+'</span></div>';
+    return '<div class="matChip'+(fresh?' fresh':'')+'">'+ic+'<span>'+k+'</span><span class="qty">x'+g.mat[k]+'</span></div>';
   });
   Object.keys(prevMats).forEach(function(k){ delete prevMats[k]; });
   keys.forEach(function(k){ prevMats[k]=g.mat[k]; });
@@ -636,9 +642,14 @@ function renderTower(){
         return '<span class="stand" data-g="'+gi+'"><span class="pawn'+(gi===state.current?' turnNow':'')+'" style="color:'+g.color+'" title="'+g.name+', '+g.progress+'/'+fl.need+' progress"></span></span>';
       }).join('')+'</span>';
     }
+    // a floor that also charges a Key shows the Key at its gate instead of the toll gatepost
+    const gk=KEYS[i];
+    const gic=gk
+      ? '<span class="gic art" style="--art:'+art('key',gk.art)+'"></span>'
+      : '<span class="gic">&#x26E9;&#xFE0F;</span>';
     track += fl.toll>0
-      ? '<span class="gate" title="Pay '+fl.toll+' '+fl.name+' to climb"><span class="gic">&#x26E9;&#xFE0F;</span>toll '+fl.toll+'</span>'
-      : '<span class="gate boss" title="Defeat the Sovereign to win"><span class="gic">&#x1F480;</span>boss</span>';
+      ? '<span class="gate" title="Pay '+fl.toll+' '+fl.name+(gk?' and the '+gk.name:'')+' to climb">'+gic+'toll '+fl.toll+'</span>'
+      : '<span class="gate boss" title="Defeat the Sovereign to win">'+gic+'boss</span>';
 
     const poolLeft=state.pools[i];
     let poolPips='';
@@ -647,10 +658,10 @@ function renderTower(){
     }
 
     rows.push(
-      '<div class="plat'+(hereNow?' hereNow':'')+(i<cam?' past':'')+(i===floors.length-1?' top':'')+'" style="--i:'+i+'; --tint:'+FLOOR_TINT[i]+';">'+
+      '<div class="plat'+(hereNow?' hereNow':'')+(i<cam?' past':'')+(i===floors.length-1?' top':'')+'" style="--i:'+i+'; --tint:'+FLOOR_TINT[i]+'; --mon:'+art('mon',i+1)+';">'+
         '<div class="frHead">'+
           '<span class="frNum">'+(i+1)+'</span>'+
-          '<span class="frIcon" title="'+fl.name+'">'+FLOOR_ICON[i]+'</span>'+
+          '<span class="frIcon art" title="'+fl.name+'"></span>'+
           '<span class="frName">'+fl.name+'</span>'+
           '<span class="frDR">'+FLOOR_RANK[i]+'-rank &middot; DR '+fl.dr+'+</span>'+
         '</div>'+
