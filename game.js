@@ -400,6 +400,12 @@ function canAdd(g,name){ const mat=g.mat||{}; return mat.hasOwnProperty(name) ||
 function addMat(g,name,qty){ if(!canAdd(g,name)) return false; g.mat=g.mat||{}; g.mat[name]=(g.mat[name]||0)+qty; return true; }
 function stockKeys(g){ const mat=g.mat||{}; return Object.keys(mat).filter(function(k){return mat[k]>0;}); }
 function matTotal(g){ let t=0; for(const k in (g.mat||{})) t+=g.mat[k]; return t; }
+function returnMat(name,qty){
+  const fi=floors.findIndex(function(fl){ return fl.name===name; });
+  if(fi<0) return;
+  const room=START_POOL-state.pools[fi];
+  state.pools[fi]+=Math.max(0,Math.min(qty,room));   // pool never exceeds START_POOL
+}
 
 // section 3: each Guild rolls, the highest total goes first
 function rollForFirstPlayer(s){
@@ -810,7 +816,7 @@ function resolveTrade(accept){
 function checkFloorCamping(g){
   if(g.turnsOnFloor>CAMP_LIMIT){
     const keys=stockKeys(g);
-    if(keys.length){ const p=keys[Math.floor(Math.random()*keys.length)]; g.mat[p]-=1; if(g.mat[p]===0) delete g.mat[p]; }
+    if(keys.length){ const p=keys[Math.floor(Math.random()*keys.length)]; g.mat[p]-=1; if(g.mat[p]===0) delete g.mat[p]; returnMat(p,1); }
     g.progress=Math.max(0,g.progress-1); g.turnsOnFloor=1;
     addLog(g.name+' camped Floor '+(g.idx+1)+' too long, the Monster attacks: -1 progress'+(keys.length?', -1 material.':'.'), 'st');
   }
@@ -1008,7 +1014,7 @@ function raidAction(){
   }
 }
 function affordGear(g,cost){ return Object.keys(cost).every(function(k){ return (g.mat[k]||0)>=cost[k]; }); }
-function payGear(g,cost){ Object.keys(cost).forEach(function(k){ g.mat[k]-=cost[k]; if(g.mat[k]<=0) delete g.mat[k]; }); }
+function payGear(g,cost){ Object.keys(cost).forEach(function(k){ g.mat[k]-=cost[k]; if(g.mat[k]<=0) delete g.mat[k]; returnMat(k,cost[k]); }); }
 function eligibleGear(g){
   const owned=g.gear||[];
   return Object.keys(GEAR).filter(function(name){
@@ -1059,6 +1065,7 @@ function transmuteAction(target){
     const take=Math.min(g.mat[k],toSpend);
     g.mat[k]-=take; toSpend-=take;
     if(g.mat[k]===0) delete g.mat[k];
+    returnMat(k,take);
   }
   addMat(g,target,1);
   addLog(g.name+' transmutes '+TRANSMUTE_COST+' materials into 1 '+target+'.');
@@ -1066,10 +1073,10 @@ function transmuteAction(target){
 function ascendAction(){
   const g=me(), f=floors[g.idx];
   if(canAscend(g)){
-    if(f.toll>0){ g.mat[f.name]-=f.toll; if(g.mat[f.name]===0) delete g.mat[f.name]; }
+    if(f.toll>0){ g.mat[f.name]-=f.toll; if(g.mat[f.name]===0) delete g.mat[f.name]; returnMat(f.name,f.toll); }
     const key=keyFor(g.idx);
     if(key){
-      for(const m in key.cost){ g.mat[m]-=key.cost[m]; if(g.mat[m]<=0) delete g.mat[m]; }
+      for(const m in key.cost){ g.mat[m]-=key.cost[m]; if(g.mat[m]<=0) delete g.mat[m]; returnMat(m,key.cost[m]); }
       addLog(g.name+' crafts and spends the '+key.name+'.', 'ev');
     }
     const clearedIdx=g.idx;
