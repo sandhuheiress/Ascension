@@ -33,7 +33,7 @@ const KEYS={
 };
 // section 11: 4 material slots and 2 item slots. section 8: 3 materials buy 1 of choice.
 // section 17: 12 rounds, then the highest climber wins.
-const CAP=4, CAMP_LIMIT=3, START_POOL=10, GEAR_SLOTS=2, TRANSMUTE_COST=3, ROUND_LIMIT=12;
+const CAP=4, CAMP_LIMIT=3, START_POOL=10, GEAR_SLOTS=2, TRANSMUTE_COST=3, ROUND_LIMIT=20;
 // most Loot Cards are the floor's raw material, a few are Broken Gear (section 5)
 const LOOT_DECK=['mat','mat','mat','mat','mat','mat','mat','mat','mat','mat','broken','broken'];
 const PALETTE=['#4fd8ff','#a480ff','#e0b756','#ff8b7a'];
@@ -400,6 +400,12 @@ function canAdd(g,name){ const mat=g.mat||{}; return mat.hasOwnProperty(name) ||
 function addMat(g,name,qty){ if(!canAdd(g,name)) return false; g.mat=g.mat||{}; g.mat[name]=(g.mat[name]||0)+qty; return true; }
 function stockKeys(g){ const mat=g.mat||{}; return Object.keys(mat).filter(function(k){return mat[k]>0;}); }
 function matTotal(g){ let t=0; for(const k in (g.mat||{})) t+=g.mat[k]; return t; }
+function returnMat(name,qty){
+  const fi=floors.findIndex(function(fl){ return fl.name===name; });
+  if(fi<0) return;
+  const room=START_POOL-state.pools[fi];
+  state.pools[fi]+=Math.max(0,Math.min(qty,room));   // pool never exceeds START_POOL
+}
 
 // section 3: each Guild rolls, the highest total goes first
 function rollForFirstPlayer(s){
@@ -689,6 +695,8 @@ function diceFace(n, cls, id){
 function setFace(el,n){ el.innerHTML=pipCells(n); el.title=n; }
 
 let lastRollKey=null;
+let lastRollKeyForSfx=null;
+let lastRollTime = 0;
 function throwDie(el, finalN){
   if(!el) return;
   el.classList.remove('rolling'); void el.offsetWidth; el.classList.add('rolling');
@@ -724,19 +732,32 @@ function renderDice(){
     : h.crit ? 'Critical hunt! +2 progress, action point refunded.'
     : h.success ? 'Success! +1 progress.'
     : 'Failed.';
+  
+  const key = (h.seq!==undefined ? h.seq : (h.guildName+'|'+h.d1+'|'+h.d2+'|'+h.total));
+  if(key!==lastRollKey){
+    lastRollKey=key;
+    lastRollTime=Date.now();
+  }
+
+  const elasped=Date.now()-lastRollTime;
+  const showLoot=h.loot && elasped<2000;
+
   box.innerHTML =
     '<p style="font-size:11.5px;color:var(--text-mid);margin:0 0 4px;">'+h.guildName+' hunts '+h.matName+'</p>'+
     '<div class="diceRow">'+diceFace(h.d1,'','dc1')+'<span class="plus">+</span>'+diceFace(h.d2,'','dc2')+'</div>'+
     (h.snake ? '<p style="font-size:12px;color:var(--text-dim);">snake eyes</p>' : '<p style="font-size:12px;color:var(--text-dim);">total '+h.total+' vs DR '+h.dr+'</p>')+
     '<p class="resultLine '+resultCls+'">'+resultText+'</p>'+
-    lootCard(h.loot);
-  const key = (h.seq!==undefined ? h.seq : (h.guildName+'|'+h.d1+'|'+h.d2+'|'+h.total));
-  if(key!==lastRollKey){
-    lastRollKey=key;
+    (showLoot ? lootCard(h.loot) : '');
+  
+  if(key!==lastRollKeyForSfx){
+    lastRollKeyForSfx=key;
     throwDie(document.getElementById('dc1'), h.d1);
     throwDie(document.getElementById('dc2'), h.d2);
     SFX.roll();
     setTimeout(function(){ (h.crit ? SFX.crit : h.success ? SFX.success : SFX.fail)(); }, 460);
+    if(h.loot){
+      setTimeout(function(){ if(lastRollKey===key) renderDice(); }, 2000);
+    }
   }
 }
 
@@ -810,7 +831,7 @@ function resolveTrade(accept){
 function checkFloorCamping(g){
   if(g.turnsOnFloor>CAMP_LIMIT){
     const keys=stockKeys(g);
-    if(keys.length){ const p=keys[Math.floor(Math.random()*keys.length)]; g.mat[p]-=1; if(g.mat[p]===0) delete g.mat[p]; }
+    if(keys.length){ const p=keys[Math.floor(Math.random()*keys.length)]; g.mat[p]-=1; if(g.mat[p]===0) delete g.mat[p]; returnMat(p,1); }
     g.progress=Math.max(0,g.progress-1); g.turnsOnFloor=1;
     addLog(g.name+' camped Floor '+(g.idx+1)+' too long, the Monster attacks: -1 progress'+(keys.length?', -1 material.':'.'), 'st');
   }
@@ -1008,7 +1029,7 @@ function raidAction(){
   }
 }
 function affordGear(g,cost){ return Object.keys(cost).every(function(k){ return (g.mat[k]||0)>=cost[k]; }); }
-function payGear(g,cost){ Object.keys(cost).forEach(function(k){ g.mat[k]-=cost[k]; if(g.mat[k]<=0) delete g.mat[k]; }); }
+function payGear(g,cost){ Object.keys(cost).forEach(function(k){ g.mat[k]-=cost[k]; if(g.mat[k]<=0) delete g.mat[k]; returnMat(k,cost[k]); }); }
 function eligibleGear(g){
   const owned=g.gear||[];
   return Object.keys(GEAR).filter(function(name){
@@ -1059,6 +1080,7 @@ function transmuteAction(target){
     const take=Math.min(g.mat[k],toSpend);
     g.mat[k]-=take; toSpend-=take;
     if(g.mat[k]===0) delete g.mat[k];
+    returnMat(k,take);
   }
   addMat(g,target,1);
   addLog(g.name+' transmutes '+TRANSMUTE_COST+' materials into 1 '+target+'.');
@@ -1066,10 +1088,10 @@ function transmuteAction(target){
 function ascendAction(){
   const g=me(), f=floors[g.idx];
   if(canAscend(g)){
-    if(f.toll>0){ g.mat[f.name]-=f.toll; if(g.mat[f.name]===0) delete g.mat[f.name]; }
+    if(f.toll>0){ g.mat[f.name]-=f.toll; if(g.mat[f.name]===0) delete g.mat[f.name]; returnMat(f.name,f.toll); }
     const key=keyFor(g.idx);
     if(key){
-      for(const m in key.cost){ g.mat[m]-=key.cost[m]; if(g.mat[m]<=0) delete g.mat[m]; }
+      for(const m in key.cost){ g.mat[m]-=key.cost[m]; if(g.mat[m]<=0) delete g.mat[m]; returnMat(m,key.cost[m]); }
       addLog(g.name+' crafts and spends the '+key.name+'.', 'ev');
     }
     const clearedIdx=g.idx;
