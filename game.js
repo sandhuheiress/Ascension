@@ -33,7 +33,7 @@ const KEYS={
 };
 // section 11: 4 material slots and 2 item slots. section 8: 3 materials buy 1 of choice.
 // section 17: 12 rounds, then the highest climber wins.
-const CAP=4, CAMP_LIMIT=3, START_POOL=10, GEAR_SLOTS=2, TRANSMUTE_COST=3, ROUND_LIMIT=12;
+const CAP=4, CAMP_LIMIT=3, START_POOL=10, GEAR_SLOTS=2, TRANSMUTE_COST=3, ROUND_LIMIT=20;
 // most Loot Cards are the floor's raw material, a few are Broken Gear (section 5)
 const LOOT_DECK=['mat','mat','mat','mat','mat','mat','mat','mat','mat','mat','broken','broken'];
 const PALETTE=['#4fd8ff','#a480ff','#e0b756','#ff8b7a'];
