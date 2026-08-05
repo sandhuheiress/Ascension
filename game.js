@@ -743,6 +743,13 @@ function renderDice(){
     throwDie(document.getElementById('dc2'), h.d2);
     SFX.roll();
     setTimeout(function(){ (h.crit ? SFX.crit : h.success ? SFX.success : SFX.fail)(); }, 460);
+    if(h.loot){
+      setTimeout(function(){
+        const el=box.querySelector('.lootCard');
+        // only hide it if we're still looking at this same roll
+        if(el && lastRollKey===key) el.style.display='none';
+      }, 2000);
+    }
   }
 }
 
