@@ -695,6 +695,8 @@ function diceFace(n, cls, id){
 function setFace(el,n){ el.innerHTML=pipCells(n); el.title=n; }
 
 let lastRollKey=null;
+let lastRollKeyForSfx=null;
+let lastRollTime = 0;
 function throwDie(el, finalN){
   if(!el) return;
   el.classList.remove('rolling'); void el.offsetWidth; el.classList.add('rolling');
@@ -730,25 +732,31 @@ function renderDice(){
     : h.crit ? 'Critical hunt! +2 progress, action point refunded.'
     : h.success ? 'Success! +1 progress.'
     : 'Failed.';
+  
+  const key = (h.seq!==undefined ? h.seq : (h.guildName+'|'+h.d1+'|'+h.d2+'|'+h.total));
+  if(key!==lastRollKey){
+    lastRollKey=key;
+    lastRollTime=Date.now();
+  }
+
+  const elasped=Date.now()-lastRollTime;
+  const showLoot=h.loot && elasped<2000;
+
   box.innerHTML =
     '<p style="font-size:11.5px;color:var(--text-mid);margin:0 0 4px;">'+h.guildName+' hunts '+h.matName+'</p>'+
     '<div class="diceRow">'+diceFace(h.d1,'','dc1')+'<span class="plus">+</span>'+diceFace(h.d2,'','dc2')+'</div>'+
     (h.snake ? '<p style="font-size:12px;color:var(--text-dim);">snake eyes</p>' : '<p style="font-size:12px;color:var(--text-dim);">total '+h.total+' vs DR '+h.dr+'</p>')+
     '<p class="resultLine '+resultCls+'">'+resultText+'</p>'+
-    lootCard(h.loot);
-  const key = (h.seq!==undefined ? h.seq : (h.guildName+'|'+h.d1+'|'+h.d2+'|'+h.total));
-  if(key!==lastRollKey){
-    lastRollKey=key;
+    (showLoot ? lootCard(h.loot) : '');
+  
+  if(key!==lastRollKeyForSfx){
+    lastRollKeyForSfx=key;
     throwDie(document.getElementById('dc1'), h.d1);
     throwDie(document.getElementById('dc2'), h.d2);
     SFX.roll();
     setTimeout(function(){ (h.crit ? SFX.crit : h.success ? SFX.success : SFX.fail)(); }, 460);
     if(h.loot){
-      setTimeout(function(){
-        const el=box.querySelector('.lootCard');
-        // only hide it if we're still looking at this same roll
-        if(el && lastRollKey===key) el.style.display='none';
-      }, 2000);
+      setTimeout(function(){ if(lastRollKey===key) renderDice(); }, 2000);
     }
   }
 }
