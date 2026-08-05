@@ -403,9 +403,9 @@ function matTotal(g){ let t=0; for(const k in (g.mat||{})) t+=g.mat[k]; return t
 function returnMat(name,qty){
   const fi=floors.findIndex(function(fl){ return fl.name===name; });
   if(fi<0) return;
-  const room=START_POOL-state.pools[fi];
-  state.pools[fi]+=Math.max(0,Math.min(qty,room));   // pool never exceeds START_POOL
+  state.pools[fi]=Math.max(0,Math.min(START_POOL,state.pools[fi]+qty));   // a negative qty draws from the pool
 }
+function spendMat(g,name,qty){ g.mat[name]-=qty; if(g.mat[name]<=0) delete g.mat[name]; returnMat(name,qty); }
 
 // section 3: each Guild rolls, the highest total goes first
 function rollForFirstPlayer(s){
@@ -1010,7 +1010,7 @@ function huntAction(){
 function trainAction(){
   const g=me(), f=floors[g.idx];
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
-  if((g.mat[f.name]||0)>=2){ g.mat[f.name]-=2; g.progress+=1; g.ap-=1; addLog(g.name+' trains using 2 '+f.name+', guaranteed +1 progress.'); }
+  if((g.mat[f.name]||0)>=2){ spendMat(g,f.name,2); g.progress+=1; g.ap-=1; addLog(g.name+' trains using 2 '+f.name+', guaranteed +1 progress.'); }
   else addLog(g.name+' needs 2 '+f.name+' in storage to train.');
 }
 function raidAction(){
@@ -1078,11 +1078,10 @@ function transmuteAction(target){
   for(const k of order){
     if(toSpend<=0) break;
     const take=Math.min(g.mat[k],toSpend);
-    g.mat[k]-=take; toSpend-=take;
-    if(g.mat[k]===0) delete g.mat[k];
-    returnMat(k,take);
+    toSpend-=take;
+    spendMat(g,k,take);
   }
-  addMat(g,target,1);
+  addMat(g,target,1); returnMat(target,-1);   // the Tower hands one back out of its own supply
   addLog(g.name+' transmutes '+TRANSMUTE_COST+' materials into 1 '+target+'.');
 }
 function ascendAction(){
@@ -1158,7 +1157,7 @@ document.getElementById('btnSendSabotage').onclick=function(){
     const g=me();
     if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
     if(!payMat || (g.mat[payMat]||0)<1){ addLog(g.name+' has no material to spend on a curse.'); return; }
-    g.mat[payMat]-=1; if(g.mat[payMat]===0) delete g.mat[payMat];
+    spendMat(g,payMat,1);
     g.ap-=1;
     state.guilds[targetIdx].hexCurse=true;
     addLog(g.name+' spends 1 '+payMat+' to curse '+state.guilds[targetIdx].name+': their next Hunt total takes -2.', 'ev');
