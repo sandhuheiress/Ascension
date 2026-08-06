@@ -1,6 +1,13 @@
+// ------------------------------------------------------------------
+// game.js - all the game logic for ascension: hunter's tower
+// firebase stuff up top for online rooms, then game data/config,
+// then screens + ui wiring, then the actual game engine + render loop,
+// then the ai bot brain all the way at the bottom
+// ------------------------------------------------------------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, off, set, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
+// firebase project config, this is what lets online rooms sync live between devices
 const firebaseConfig = {
   apiKey: "AIzaSyCETNzuvNn0-f5CsJhR_okTIgyJMC-dEPQ",
   authDomain: "ascension-e83bb.firebaseapp.com",
@@ -14,6 +21,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
+// all 6 tower floors - name, dr (what you need to roll to hunt), progress needed to ascend, toll to leave
 const floors=[
   {name:"Kasaka Fang", dr:6, need:3, toll:1},
   {name:"Golem Crystal", dr:7, need:4, toll:2},
@@ -40,6 +48,7 @@ const CAP=4, CAMP_LIMIT=4, GEAR_SLOTS=3, TRANSMUTE_COST=3, LOOT_REVEAL_MS=4500;
 function poolCapFor(n){ return 5*n; }
 // most Loot Cards are the floor's raw material, a few are Broken Gear (section 5)
 const LOOT_DECK=['mat','mat','mat','mat','mat','mat','mat','mat','mat','mat','broken','broken'];
+// default guild colors, used before someone actually picks their own
 const PALETTE=['#4fd8ff','#a480ff','#e0b756','#ff8b7a'];
 const FLOOR_TINT=['#4fd8ff','#5de0c8','#a480ff','#d97fe0','#e0b756','#ff8b7a'];
 const FLOOR_RANK=['E','D','C','B','A','S'];
@@ -52,6 +61,7 @@ const COLOR_OPTIONS=[
   {color:'#e0b756', name:'Topaz'},
   {color:'#ff8b7a', name:'Ember'}
 ];
+// every piece of gear you can craft, what it costs and what it actually does
 const GEAR={
   'Basic Bow':      { type:'weapon', line:'bow',   tier:1, cost:{'Kasaka Fang':2}, desc:'Reroll one die once, must accept the new sum.' },
   'Upgraded Bow':   { type:'weapon', line:'bow',   tier:2, cost:{'Golem Crystal':2}, requires:'Basic Bow', desc:'Reroll one die once, add the new value on top of the original total.' },
@@ -64,9 +74,21 @@ const GEAR={
   // never crafted, only ever a lucky Loot Card draw (section 12)
   'Broken Gear':    { type:'broken', cost:{}, desc:'Single use: +2 to one hunt, then it breaks.' }
 };
+// emoji fallback icon, only used if a gear piece has no real art yet
 const GEAR_ICON={ 'Basic Bow':'\u{1F3F9}', 'Upgraded Bow':'\u{1F3F9}✨', 'Basic Sword':'⚔️', 'Upgraded Sword':'\u{1F5E1}️', 'Shield':'\u{1F6E1}️', 'Lucky Coin':'\u{1F340}', 'Compass':'\u{1F9ED}', 'Ironclad Ward':'\u{1F6E1}️✨', 'Broken Gear':'\u{1FA93}' };
+// art/icons is full-color art (not the black line-work the rest of art/ uses),
+// so it skips the invert filter via the existing .ink modifier. Only 5 of the
+// 9 gear pieces have custom art so far — anything missing here just falls
+// back to its emoji, same as before.
+const GEAR_ART={ 'Basic Bow':'icon_basic_bow', 'Basic Sword':'icon_basic_sword', 'Compass':'icon_compass', 'Lucky Coin':'icon_lucky_coin', 'Shield':'icon_shield' };
+function gearIcon(name){
+  const file=GEAR_ART[name];
+  if(!file) return '<span class="ic">'+(GEAR_ICON[name]||'&#x1F392;')+'</span>';
+  return '<span class="ic art ink" style="--art:'+art('icons',file)+'"></span>';
+}
 // a material is worth its floor, so the tiebreaker can price a mat at the end (section 17)
 const MAT_VALUE={}; floors.forEach(function(f,i){ MAT_VALUE[f.name]=i+1; });
+// random tower events - roughly 1 in 3 turns rolls one of these
 const EVENTS=[
   {label:'Windfall', apply:function(g,pools){const f=floors[g.idx]; if(pools[g.idx]>0&&addMat(g,f.name,1)){pools[g.idx]-=1; return g.name+' finds a Windfall cache: +1 '+f.name+'.';} return g.name+' finds a Windfall cache, but storage is full.';}},
   {label:'Ambush', apply:function(g){g.progress=Math.max(0,g.progress-1); return g.name+' is Ambushed by lesser beasts: -1 progress.';}},
@@ -82,6 +104,34 @@ const EVENTS=[
   {label:'Merchant caravan', apply:function(g){ g.ap+=1; return 'A Merchant Caravan passes through: '+g.name+' gains +1 action point this turn.'; }},
   {label:'Stormfront', apply:function(g){ g.hexCurse=true; return 'A Stormfront rolls over the Tower: '+g.name+"'s next Hunt total takes -1."; }}
 ];
+
+// hero title flicker/lightning backdrop (index.html)
+(function () {
+  const flicker = document.getElementById('heroFlicker');
+  if (!flicker) return;
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion) return;
+
+  // low-level ember flicker: irregular opacity jitter, not a smooth pulse
+  function ember() {
+    flicker.style.opacity = (0.55 + Math.random() * 0.35).toFixed(2);
+  }
+  setInterval(ember, 120 + Math.random() * 180);
+
+  // occasional lightning strike: a bright flash that decays back to the ember glow
+  function strike() {
+    flicker.style.transition = 'none';
+    flicker.style.opacity = '1';
+    flicker.style.background = 'radial-gradient(circle at 50% 40%, rgba(224,220,255,0.5), transparent 65%)';
+    requestAnimationFrame(function () {
+      flicker.style.transition = 'opacity 0.3s ease, background 0.3s ease';
+      flicker.style.opacity = '0.65';
+      flicker.style.background = 'radial-gradient(circle at 50% 40%, rgba(139,92,246,0.22), transparent 60%)';
+    });
+    setTimeout(strike, 8000 + Math.random() * 7000);
+  }
+  setTimeout(strike, 4000);
+})();
 
 // ---- sound: short synthesised cues, no audio files and no library ----
 let actx=null, muted=localStorage.getItem('ascension_muted')==='1';
@@ -139,16 +189,20 @@ document.getElementById('btnSpeed').onclick=function(){
   this.textContent=BOT_SPEED_LABELS[botSpeedIdx];
 };
 
+// random id saved on this device/browser so it knows which seat is "yours" in an online room
 let deviceId = localStorage.getItem('ascension_device_id');
 if(!deviceId){ deviceId='d'+Math.random().toString(36).slice(2,10); localStorage.setItem('ascension_device_id', deviceId); }
 
+// `state` is the entire live game - basically everything reads from it and writes back to it
 let roomCode=null, myGuildIndex=null, state=null, LOCAL_MODE=false, lastHumanSeatLocal=null;
 let botStepScheduled=false;
 function roomRef(){ return ref(db, 'rooms/'+roomCode); }
 
+// just the setup screens, this is what swaps which one is visible
 function screens(){ return ['screenHome','screenCreate','screenIdentity','screenJoin','screenSlots','screenLobby']; }
 function showScreen(id){ screens().forEach(function(s){ document.getElementById(s).style.display = (s===id)?(s==='screenHome'?'block':'block'):'none'; }); document.getElementById('game').style.display='none'; document.body.classList.remove('in-game'); }
 // informational only, no consequence: just shows how long the current turn has run
+// purely a visible timer for the current turn, doesn't affect the game at all
 let turnStartedAt=null, lastTurnKey=null;
 function updateTurnTimerDisplay(){
   const el=document.getElementById('turnTimer');
@@ -158,6 +212,7 @@ function updateTurnTimerDisplay(){
 }
 setInterval(updateTurnTimerDisplay, 1000);
 
+// tutorial / coach tip state - tracks whether tutorial mode is on and which tips already fired
 let tutorialOn=false, tutorialPrompted=false, tutorialChoiceMade=false, gamePaused=false;
 const seenTips=new Set();
 // nothing (bot turns, your own actions) moves while a choice is pending or the
@@ -238,6 +293,7 @@ function renderSeatingRollOverlay(){
   };
 }
 
+// pause/resume, only really makes sense in a local game against ai
 function setPaused(p){
   gamePaused=p;
   document.getElementById('pausedBanner').classList.toggle('show', p);
@@ -297,6 +353,7 @@ document.getElementById('modeOnlineBtn').onclick=function(){
   document.getElementById('homeLocalPanel').style.display='none';
 };
 
+// the how to play popup, same one whether it's opened from home or mid-game
 function openHowTo(){ document.getElementById('howToOverlay').classList.add('show'); }
 function closeHowTo(){ document.getElementById('howToOverlay').classList.remove('show'); }
 document.getElementById('btnHowToHome').onclick=openHowTo;
@@ -464,8 +521,11 @@ function renderLocalSeatRow(){
 });
 renderLocalSeatRow();
 
+// random 4 letter room code for online games
 function genCode(){ const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<4;i++) s+=chars[Math.floor(Math.random()*chars.length)]; return s; }
+// starting stats for a brand new guild
 function freshGuild(i){ return { name:'Guild '+String.fromCharCode(65+i), color:PALETTE[i], idx:0, progress:0, ap:2, mat:{}, gear:[], turnsOnFloor:1, eventCurse:false, hexCurse:false, hexCurseHeavy:false, claimedBy:null, isBot:false }; }
+// builds the whole starting game state for however many players are in this game
 function freshState(n){
   const poolCap=poolCapFor(n);
   return {
@@ -488,6 +548,7 @@ function freshState(n){
   };
 }
 
+// joining an existing online room by its code
 document.getElementById('btnFindRoom').onclick=async function(){
   const code=document.getElementById('joinCodeInput').value.trim().toUpperCase();
   const errEl=document.getElementById('joinErr');
@@ -506,6 +567,7 @@ document.getElementById('btnFindRoom').onclick=async function(){
   }
 };
 
+// pick which open guild slot you want to claim in the room
 function renderSlotPicker(s){
   const row=document.getElementById('slotRow');
   row.innerHTML='';
@@ -533,6 +595,8 @@ function renderSlotPicker(s){
   });
 }
 
+// the firebase listener - this is what actually makes online play feel live,
+// every connected device gets the new state the moment anything changes
 function attachListener(){
   onValue(roomRef(), function(snap){
     state=snap.val();
@@ -542,6 +606,7 @@ function attachListener(){
   });
 }
 
+// the waiting room screen before the game actually starts
 function renderLobby(){
   document.getElementById('lobbyCode').textContent=roomCode;
   const row=document.getElementById('lobbySlots');
@@ -719,6 +784,8 @@ async function withState(fn){
   await pushState();
 }
 
+// the big one. this redraws basically the whole game screen, gets called after
+// pretty much every single action so the ui always matches the current state
 function render(){
   if(!state) return;
   renderSeatingRollOverlay();
@@ -922,6 +989,7 @@ function checkForNewActivity(){
   }
 }
 
+// just remembers what you were holding last render, so newly gained stuff can animate in
 const prevMats={};
 let prevGear=[];
 
@@ -951,9 +1019,8 @@ function renderPlacemat(){
   keys.forEach(function(k){ prevMats[k]=g.mat[k]; });
 
   const gearChips=gear.map(function(name){
-    const ic=GEAR_ICON[name]||'&#x1F392;';
     const fresh=prevGear.indexOf(name)<0;
-    return '<div class="matCard gear'+(fresh?' fresh':'')+'" style="--tint:var(--violet)"><span class="ic">'+ic+'</span><span class="mcName">'+name+'</span></div>';
+    return '<div class="matCard gear'+(fresh?' fresh':'')+'" style="--tint:var(--violet)">'+gearIcon(name)+'<span class="mcName">'+name+'</span></div>';
   });
   prevGear=gear.slice();
   if(matChips.concat(gearChips).some(function(c){ return c.indexOf('fresh')>=0; })) SFX.gain();
@@ -969,6 +1036,7 @@ function renderPlacemat(){
   document.getElementById('placematGear').innerHTML = pad(gearChips, GEAR_SLOTS);
 }
 
+// tracks where each guild's pawn was standing so it can animate to the new spot instead of just popping there
 const pawnAt={};
 const PLAT_TILT=50;
 
@@ -992,6 +1060,7 @@ function movePawns(){
   });
 }
 
+// draws the actual 3d tower - every floor, all the pawns, progress tracks, all of it
 function renderTower(){
   const list=document.getElementById('towerList');
   const cam=me().idx;
@@ -1046,6 +1115,7 @@ function renderTower(){
   movePawns();
 }
 
+// dot layout for each dice face, 1 through 6
 const PIP_MAP={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 function pipCells(n){
   const on=PIP_MAP[n]||[];
@@ -1071,6 +1141,7 @@ function throwDie(el, finalN){
   }, 65);
 }
 
+// renders one loot card, either a material or a broken gear card
 function lootCard(loot){
   if(!loot) return '';
   const face = loot.kind==='mat'
@@ -1080,6 +1151,7 @@ function lootCard(loot){
   return '<div class="lootCard" style="--tint:'+tint+'"><span class="lootTag">Loot</span>'+face+'<span class="lootName">'+loot.name+'</span></div>';
 }
 
+// the dice roll + result display at the bottom of the screen
 function renderDice(){
   const box=document.getElementById('diceReveal');
   const h=state.lastHunt;
@@ -1131,6 +1203,7 @@ function renderDice(){
   }
 }
 
+// keeps the raid/sabotage/transmute target dropdowns pointed at guilds that are still valid targets
 function refreshTargetSelects(){
   const opts = others().map(function(o){ return '<option value="'+o.i+'">'+o.g.name+'</option>'; }).join('');
   ['sabTarget','raidTarget'].forEach(function(id){
@@ -1249,7 +1322,7 @@ function renderGearSwap(){
   if(ps && ps.guildIdx===myActiveIdx() && !state.guilds[ps.guildIdx].isBot){
     banner.classList.add('show');
     const optsHtml=ps.current.map(function(name){
-      return '<button class="gsOption" type="button" data-name="'+name+'"><span class="ic">'+(GEAR_ICON[name]||'')+'</span> Drop '+name+'</button>';
+      return '<button class="gsOption" type="button" data-name="'+name+'">'+gearIcon(name)+' Drop '+name+'</button>';
     }).join('');
     banner.innerHTML = '<div class="lcTitle">Gear full</div><div class="lcSub">Keep both current pieces and leave the new Broken Gear, or drop one to make room.</div>'+
       '<div class="lcOptions">'+optsHtml+'</div>'+
@@ -1289,6 +1362,7 @@ function renderLootChoice(){
     banner.innerHTML='';
   }
 }
+// actually gives you whichever loot card you just clicked on
 function claimLoot(idx){
   const pl=state.pendingLoot;
   if(!pl) return;
@@ -1391,6 +1465,7 @@ function acceptOffer(wantId, offerId){
   state.tradeWants.splice(wIdx,1);
 }
 
+// punishes sitting on the same floor too long instead of pushing to ascend
 function checkFloorCamping(g){
   if(g.turnsOnFloor>CAMP_LIMIT){
     g.turnsOnFloor=1;
@@ -1404,6 +1479,7 @@ function checkFloorCamping(g){
     addLog(g.name+' camped Floor '+(g.idx+1)+' too long, the Monster attacks (rolled '+roll+'): '+(keys.length?'-1 material.':'nothing to take.'), 'st');
   }
 }
+// rolls to see if a random tower event fires at the start of this turn
 function maybeDrawEvent(g){
   const roll=1+Math.floor(Math.random()*6);
   if(roll>=5){
@@ -1470,6 +1546,7 @@ function concludeGame(){
   addLog('The expedition is called. '+state.guilds[ranking[0].i].name+' holds the strongest position.', 'wn');
 }
 
+// wraps up whoever's turn it currently is and hands it off to the next guild
 function endTurnAction(){
   if(state.winner!==null && state.winner!==undefined) return;
   const n=state.guilds.length;
@@ -1681,6 +1758,7 @@ function huntAction(useBrokenGear){
   g.hexCurseHeavy=false;
   state.lastHunt=hunt;
 }
+// the safe option - spend 2 of this floor's material for a guaranteed +1 progress, no dice involved
 function trainAction(){
   const g=me(), f=floors[g.idx];
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
@@ -1735,6 +1813,7 @@ function raidAction(targetIdx, wagerMat){
     ? (g.name+' raids '+t.name+': '+atkScore+' vs '+defScore+', stealing 1 '+s+'.')
     : (g.name+' raids '+t.name+' and wins the roll, '+atkScore+' vs '+defScore+', but they had nothing to take.'))+allInTag, 'st');
 }
+// how much extra a guild's gear adds on top of their raid roll
 function raidGearBonus(g){
   let bonus=0;
   (g.gear||[]).forEach(function(name){
@@ -1763,6 +1842,7 @@ function eligibleGear(g){
     return true;
   });
 }
+// actually crafts or upgrades a piece of gear once you can afford it
 function craftAction(itemName){
   const g=me();
   const def=GEAR[itemName];
@@ -1803,6 +1883,7 @@ function transmuteAction(target){
   addMat(g,target,1); returnMat(target,-1);   // the Tower hands one back out of its own supply
   addLog(g.name+' transmutes '+TRANSMUTE_COST+' materials into 1 '+target+'.');
 }
+// moves a guild up to the next floor once they've actually earned it
 function ascendAction(){
   const g=me(), f=floors[g.idx];
   if(canAscend(g)){
@@ -1954,7 +2035,7 @@ function renderBlacksmithShop(){
       return '<span class="costPill'+(short?' short':'')+'">'+def.cost[m]+' '+m+'</span>';
     }).join('');
     return '<div class="shopItem'+(reason?' locked':'')+'">'+
-      '<div class="shopIcon">'+(GEAR_ICON[name]||'&#x1F392;')+'</div>'+
+      '<div class="shopIcon">'+gearIcon(name)+'</div>'+
       '<div class="shopName">'+name+'</div>'+
       '<div class="shopCost">'+(costChips||'<span class="costPill">free</span>')+'</div>'+
       '<div class="shopDesc">'+def.desc+'</div>'+
@@ -2007,6 +2088,8 @@ function maybeBotContinue(){
   setTimeout(function(){ botStepScheduled=false; botStep(); }, BOT_SPEEDS[botSpeedIdx]);
 }
 
+// this is basically the whole ai brain - one function that decides everything
+// a bot does on its turn, checked one option at a time top to bottom
 function botStep(){
   if(!state) return;
   if(state.winner!==null && state.winner!==undefined) return;
