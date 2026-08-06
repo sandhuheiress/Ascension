@@ -439,7 +439,7 @@ function guildValue(g){
   });
   return v;
 }
-function steal(from,to){ const keys=stockKeys(from); if(!keys.length) return null; const p=keys[Math.floor(Math.random()*keys.length)]; from.mat[p]-=1; if(from.mat[p]===0) delete from.mat[p]; return addMat(to,p,1)?p:null; }
+function steal(from,to){ const keys=stockKeys(from); if(!keys.length) return null; const p=keys[Math.floor(Math.random()*keys.length)]; from.mat[p]-=1; if(from.mat[p]===0) delete from.mat[p]; if(addMat(to,p,1)) return p; addMat(from,p,1); return null; }
 async function pushState(){ await set(roomRef(), state); }
 
 async function withState(fn){
@@ -763,7 +763,7 @@ function renderDice(){
 
 function refreshTargetSelects(){
   const opts = others().map(function(o){ return '<option value="'+o.i+'">'+o.g.name+'</option>'; }).join('');
-  ['tradeTarget','sabTarget'].forEach(function(id){
+  ['tradeTarget','sabTarget', 'raidTarget'].forEach(function(id){
     const sel=document.getElementById(id);
     const prev=sel.value;
     sel.innerHTML=opts;
@@ -771,7 +771,9 @@ function refreshTargetSelects(){
   });
   const allMats=floors.map(function(f){return f.name;});
   const giveMat=document.getElementById('tradeGiveMat');
+  const giveMatPrev=giveMat.value;
   giveMat.innerHTML = stockKeys(me()).map(function(k){return '<option value="'+k+'">'+k+'</option>';}).join('') || '<option value="">none</option>';
+  if(giveMatPrev) giveMat.value=giveMatPrev;
   const giveQty=document.getElementById('tradeGiveQty');
   const maxGive = (me().mat||{})[giveMat.value] || 0;
   giveQty.innerHTML = Array.from({length: Math.max(1,maxGive)}, function(_,i){return i+1;}).map(function(n){return '<option value="'+n+'">'+n+'</option>';}).join('');
@@ -1013,19 +1015,30 @@ function trainAction(){
   if((g.mat[f.name]||0)>=2){ spendMat(g,f.name,2); g.progress+=1; g.ap-=1; addLog(g.name+' trains using 2 '+f.name+', guaranteed +1 progress.'); }
   else addLog(g.name+' needs 2 '+f.name+' in storage to train.');
 }
-function raidAction(){
+function raidAction(targetIdx){
   const g=me();
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
-  const targets=others();
-  if(!targets.length) return;
-  const t=targets[Math.floor(Math.random()*targets.length)].g;
+  const t=state.guilds[targetIdx];
+  if(!t || targetIdx===state.current) return;
   g.ap-=1;
-  const roll=1+Math.floor(Math.random()*6);
-  if(roll>=4){
+
+  const ad1=1+Math.floor(Math.random()*6), ad2=1+Math.floor(Math.random()*6);
+  const dd1=1+Math.floor(Math.random()*6), dd2=1+Math.floor(Math.random()*6);
+  const atkBonus=raidGearBonus(g), defBonus=raidGearBonus(t);
+  const atkScore=ad1+ad2+atkBonus, defScore=dd1+dd2+defBonus;
+
+  // attacker's Broken Gear is used up in the attempt; defender's is not, since they didn't choose to spend it
+  if((g.gear||[]).includes('Broken Gear')){
+    g.gear=g.gear.filter(function(x){ return x!=='Broken Gear'; });
+  }
+
+  if(atkScore>defScore){
     const s=steal(t,g);
-    addLog(s? (g.name+' raids '+t.name+' (rolled '+roll+'), stealing 1 '+s+'.') : (g.name+' raids '+t.name+' but they had nothing to take.'), 'st');
+    addLog(s
+      ? (g.name+' raids '+t.name+': '+atkScore+' ('+ad1+'+'+ad2+'+'+atkBonus+') vs '+defScore+' ('+dd1+'+'+dd2+'+'+defBonus+'), stealing 1 '+s+'.')
+      : (g.name+' raids '+t.name+' and wins the roll, '+atkScore+' vs '+defScore+', but they had nothing to take.'), 'st');
   } else {
-    addLog(g.name+' raids '+t.name+' and rolls '+roll+', fought off.');
+    addLog(g.name+' raids '+t.name+' and loses the roll, '+atkScore+' ('+ad1+'+'+ad2+'+'+atkBonus+') vs '+defScore+' ('+dd1+'+'+dd2+'+'+defBonus+'), fought off.');
   }
 }
 function affordGear(g,cost){ return Object.keys(cost).every(function(k){ return (g.mat[k]||0)>=cost[k]; }); }
@@ -1045,6 +1058,18 @@ function eligibleGear(g){
     }
     return true;
   });
+}
+// raid score bonuses: weapons and the two active accessories contribute, shield does not
+function raidGearBonus(g){
+  let bonus=0;
+  (g.gear||[]).forEach(function(name){
+    const def=GEAR[name];
+    if(!def) return;
+    if(def.type==='weapon') bonus += (def.tier===2 ? 3 : 2);
+    else if(name==='Lucky Coin' || name==='Compass') bonus += 1;
+    else if(def.type==='broken') bonus += 2;
+  });
+  return bonus;
 }
 function craftAction(itemName){
   const g=me();
@@ -1113,10 +1138,21 @@ function keyCostText(idx){
 document.getElementById('btnEndTurn').onclick=function(){ if(!isMyTurn()) return; withState(endTurnAction); };
 document.getElementById('btnHunt').onclick=function(){ if(!isMyTurn()) return; withState(huntAction); };
 document.getElementById('btnTrain').onclick=function(){ if(!isMyTurn()) return; withState(trainAction); };
-document.getElementById('btnRaid').onclick=function(){ if(!isMyTurn()) return; withState(raidAction); };
+document.getElementById('btnRaid').onclick=function(){
+  document.getElementById('raidPanel').classList.toggle('show');
+  ['tradePanel','sabotagePanel','blacksmithPanel'].forEach(function(id){ document.getElementById(id).classList.remove('show'); });
+  refreshTargetSelects();
+};
+document.getElementById('btnCancelRaid').onclick=function(){ document.getElementById('raidPanel').classList.remove('show'); };
+document.getElementById('btnSendRaid').onclick=function(){
+  if(!isMyTurn()) return;
+  const targetIdx=parseInt(document.getElementById('raidTarget').value,10);
+  withState(function(){ raidAction(targetIdx); });
+  document.getElementById('raidPanel').classList.remove('show');
+};
 document.getElementById('btnTransmute').onclick=function(){
   document.getElementById('transmutePanel').classList.toggle('show');
-  ['tradePanel','sabotagePanel','blacksmithPanel'].forEach(function(id){ document.getElementById(id).classList.remove('show'); });
+  ['tradePanel','raidPanel','sabotagePanel','blacksmithPanel'].forEach(function(id){ document.getElementById(id).classList.remove('show'); });
   refreshTargetSelects();
 };
 document.getElementById('btnCancelTransmute').onclick=function(){ document.getElementById('transmutePanel').classList.remove('show'); };
@@ -1128,8 +1164,11 @@ document.getElementById('btnDoTransmute').onclick=function(){
 };
 document.getElementById('btnScavenge').onclick=function(){ if(!isMyTurn()) return; withState(scavengeAction); };
 document.getElementById('btnAscend').onclick=function(){ if(!isMyTurn()) return; withState(ascendAction); };
-
-document.getElementById('btnTradeToggle').onclick=function(){ document.getElementById('tradePanel').classList.toggle('show'); document.getElementById('sabotagePanel').classList.remove('show'); refreshTargetSelects(); };
+document.getElementById('btnTradeToggle').onclick=function(){
+  document.getElementById('tradePanel').classList.toggle('show');
+  ['sabotagePanel','raidPanel','blacksmithPanel','transmutePanel'].forEach(function(id){ document.getElementById(id).classList.remove('show'); });
+  refreshTargetSelects();
+};
 document.getElementById('btnCancelTrade').onclick=function(){ document.getElementById('tradePanel').classList.remove('show'); };
 document.getElementById('btnSendTrade').onclick=function(){
   if(!isMyTurn()) return;
@@ -1146,8 +1185,11 @@ document.getElementById('btnSendTrade').onclick=function(){
   });
   document.getElementById('tradePanel').classList.remove('show');
 };
-
-document.getElementById('btnSabotageToggle').onclick=function(){ document.getElementById('sabotagePanel').classList.toggle('show'); document.getElementById('tradePanel').classList.remove('show'); refreshTargetSelects(); };
+document.getElementById('btnSabotageToggle').onclick=function(){
+  document.getElementById('sabotagePanel').classList.toggle('show');
+  ['tradePanel','raidPanel','blacksmithPanel','transmutePanel'].forEach(function(id){ document.getElementById(id).classList.remove('show'); });
+  refreshTargetSelects();
+};
 document.getElementById('btnCancelSabotage').onclick=function(){ document.getElementById('sabotagePanel').classList.remove('show'); };
 document.getElementById('btnSendSabotage').onclick=function(){
   if(!isMyTurn()) return;
@@ -1169,6 +1211,7 @@ document.getElementById('btnBlacksmithToggle').onclick=function(){
   document.getElementById('blacksmithPanel').classList.toggle('show');
   document.getElementById('tradePanel').classList.remove('show');
   document.getElementById('sabotagePanel').classList.remove('show');
+  document.getElementById('raidPanel').classList.remove('show');
   populateBlacksmith();
 };
 document.getElementById('btnCancelBlacksmith').onclick=function(){ document.getElementById('blacksmithPanel').classList.remove('show'); };
@@ -1255,6 +1298,11 @@ function botStep(){
     if(craftable){ withState(function(){ craftAction(craftable); }); return; }
   }
   if((g.mat[f.name]||0)>=2 && Math.random()<0.5){ withState(trainAction); return; }
-  if(Math.random()<0.15 && others().some(function(o){return stockKeys(o.g).length;})){ withState(raidAction); return; }
+  if(Math.random()<0.15 && others().some(function(o){return stockKeys(o.g).length;})){
+    const targets=others().filter(function(o){ return stockKeys(o.g).length>0; });
+    const t=targets[Math.floor(Math.random()*targets.length)].i;
+    withState(function(){ raidAction(t); });
+    return;
+  }
   withState(huntAction);
 }
