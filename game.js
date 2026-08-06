@@ -65,6 +65,16 @@ const GEAR={
   'Broken Gear':    { type:'broken', cost:{}, desc:'Single use: +2 to one hunt, then it breaks.' }
 };
 const GEAR_ICON={ 'Basic Bow':'\u{1F3F9}', 'Upgraded Bow':'\u{1F3F9}✨', 'Basic Sword':'⚔️', 'Upgraded Sword':'\u{1F5E1}️', 'Shield':'\u{1F6E1}️', 'Lucky Coin':'\u{1F340}', 'Compass':'\u{1F9ED}', 'Ironclad Ward':'\u{1F6E1}️✨', 'Broken Gear':'\u{1FA93}' };
+// art/icons is full-color art (not the black line-work the rest of art/ uses),
+// so it skips the invert filter via the existing .ink modifier. Only 5 of the
+// 9 gear pieces have custom art so far — anything missing here just falls
+// back to its emoji, same as before.
+const GEAR_ART={ 'Basic Bow':'icon_basic_bow', 'Basic Sword':'icon_basic_sword', 'Compass':'icon_compass', 'Lucky Coin':'icon_lucky_coin', 'Shield':'icon_shield' };
+function gearIcon(name){
+  const file=GEAR_ART[name];
+  if(!file) return '<span class="ic">'+(GEAR_ICON[name]||'&#x1F392;')+'</span>';
+  return '<span class="ic art ink" style="--art:'+art('icons',file)+'"></span>';
+}
 // a material is worth its floor, so the tiebreaker can price a mat at the end (section 17)
 const MAT_VALUE={}; floors.forEach(function(f,i){ MAT_VALUE[f.name]=i+1; });
 const EVENTS=[
@@ -951,9 +961,8 @@ function renderPlacemat(){
   keys.forEach(function(k){ prevMats[k]=g.mat[k]; });
 
   const gearChips=gear.map(function(name){
-    const ic=GEAR_ICON[name]||'&#x1F392;';
     const fresh=prevGear.indexOf(name)<0;
-    return '<div class="matCard gear'+(fresh?' fresh':'')+'" style="--tint:var(--violet)"><span class="ic">'+ic+'</span><span class="mcName">'+name+'</span></div>';
+    return '<div class="matCard gear'+(fresh?' fresh':'')+'" style="--tint:var(--violet)">'+gearIcon(name)+'<span class="mcName">'+name+'</span></div>';
   });
   prevGear=gear.slice();
   if(matChips.concat(gearChips).some(function(c){ return c.indexOf('fresh')>=0; })) SFX.gain();
@@ -1249,7 +1258,7 @@ function renderGearSwap(){
   if(ps && ps.guildIdx===myActiveIdx() && !state.guilds[ps.guildIdx].isBot){
     banner.classList.add('show');
     const optsHtml=ps.current.map(function(name){
-      return '<button class="gsOption" type="button" data-name="'+name+'"><span class="ic">'+(GEAR_ICON[name]||'')+'</span> Drop '+name+'</button>';
+      return '<button class="gsOption" type="button" data-name="'+name+'">'+gearIcon(name)+' Drop '+name+'</button>';
     }).join('');
     banner.innerHTML = '<div class="lcTitle">Gear full</div><div class="lcSub">Keep both current pieces and leave the new Broken Gear, or drop one to make room.</div>'+
       '<div class="lcOptions">'+optsHtml+'</div>'+
@@ -1963,7 +1972,7 @@ function renderBlacksmithShop(){
       return '<span class="costPill'+(short?' short':'')+'">'+def.cost[m]+' '+m+'</span>';
     }).join('');
     return '<div class="shopItem'+(reason?' locked':'')+'">'+
-      '<div class="shopIcon">'+(GEAR_ICON[name]||'&#x1F392;')+'</div>'+
+      '<div class="shopIcon">'+gearIcon(name)+'</div>'+
       '<div class="shopName">'+name+'</div>'+
       '<div class="shopCost">'+(costChips||'<span class="costPill">free</span>')+'</div>'+
       '<div class="shopDesc">'+def.desc+'</div>'+
