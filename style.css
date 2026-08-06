@@ -205,6 +205,11 @@ body.in-game { max-width: none; padding: 0; overflow: hidden; display: block; }
 body.in-game #game { position: fixed; inset: 0; display: block; }
 
 #world { position: absolute; inset: 0; overflow: hidden; perspective: 1150px; perspective-origin: 50% 52%; }
+/* the camera pans down as you climb, so cleared floors slide under the action bar and read through it */
+#world::after {
+  content:''; position:absolute; inset:0; pointer-events:none; z-index: 2;
+  background: linear-gradient(to bottom, transparent 58%, var(--bg-deep) 76%);
+}
 #towerList {
   position: absolute; left: 50%; bottom: 37%; width: 0; height: 0;
   transform-style: preserve-3d;
