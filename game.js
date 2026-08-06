@@ -899,6 +899,7 @@ function endTurnAction(){
   state.lastHunt=null;
   const g=me();
   g.ap=2; g.hexCurse=false; g.scavenged=false;
+  g.turnsOnFloor=(g.turnsOnFloor||0)+1;   // nothing was counting this, so the camp penalty never fired
   checkFloorCamping(g);
   addLog('--- '+g.name+"'s turn begins (round "+state.round+" of "+ROUND_LIMIT+"). ---");
   maybeDrawEvent(g);
