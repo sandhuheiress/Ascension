@@ -74,13 +74,64 @@
   h1.title {
     font-family: 'Cinzel', serif;
     font-weight: 700;
-    font-size: 28px;
-    letter-spacing: 1.5px;
+    font-size: clamp(42px, 7vw, 72px);  /* scales up with screen size */
+    letter-spacing: 2px;
     margin: 0 0 2px;
     text-align: center;
     color: var(--text-hi);
-    text-shadow: 0 0 16px rgba(139, 92, 246, 0.5), 0 0 36px rgba(224, 183, 86, 0.22);
+
   }
+
+/* --- hero title upgrade: bigger, centered, glowing/flickering backdrop --- */
+.heroWrap {
+  position: relative;
+  min-height: 46vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+#heroFlicker {
+  position: absolute;
+  inset: -60px -120px auto;
+  height: 320px;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 40%, rgba(139, 92, 246, 0.22), transparent 60%);
+  filter: blur(20px);
+  opacity: 0.7;
+  transition: opacity 0.08s linear, background 0.3s ease;
+  z-index: 0;
+}
+
+.heroWrap h1.title,
+.heroWrap p.subtitle {
+  position: relative;
+  z-index: 1;
+}
+
+.heroWrap h1.title {
+  font-size: clamp(38px, 6.5vw, 68px);
+  animation: titleGlow 4s ease-in-out infinite;
+}
+
+@keyframes titleGlow {
+  0%, 100% {
+    text-shadow: 0 0 20px rgba(139, 92, 246, 0.6), 0 0 44px rgba(139, 92, 246, 0.25);
+  }
+  50% {
+    text-shadow: 0 0 22px rgba(230, 194, 106, 0.65), 0 0 48px rgba(230, 194, 106, 0.28);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .heroWrap h1.title { animation: none; }
+  #heroFlicker { display: none; }
+}
+
+body.in-game .heroWrap { display: none; }
+  
 
   p.subtitle {
     text-align: center;
