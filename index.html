@@ -270,10 +270,6 @@
       <div class="panelInline glass" id="raidPanel">
         <div class="row">
           <div class="field"><label>Target</label><select id="raidTarget"></select></div>
-          <div class="field"><label>If it lands</label><select id="raidGoal">
-            <option value="steal">Steal 1 material</option>
-            <option value="destroy">Destroy 1 gear piece</option>
-          </select></div>
         </div>
         <label class="wagerRow"><input type="checkbox" id="raidWagerToggle"><span>All-in: wager a material. Win it back and knock them down 1 progress too &mdash; lose, and they keep your stake.</span></label>
         <div class="row" id="raidWagerRow" style="display:none;">
@@ -346,7 +342,7 @@
     <div class="howRow"><span class="hic">&#x2694;&#xFE0F;</span><span class="htxt"><b>Turn actions (2 AP):</b> Hunt, Train, Raid, Sabotage, and Ascend each cost 1 action point. Trade, Craft, and Transmute are free.</span></div>
     <div class="howRow"><span class="hic">&#x1F3B2;</span><span class="htxt"><b>Hunt:</b> roll 2d6 vs the floor's DR. Success grants +1 progress and a Loot Card, usually this floor's material, sometimes Broken Gear (single use, +2 to a Hunt &mdash; equip it and a checkbox lets you decide which Hunt to spend it on, it's never forced). A natural 2 raids whichever rival shares your floor instead of costing you progress &mdash; only an empty floor (or a Shield) spares you. Double sixes crit for +2 progress, two Loot Cards, and a free action. When a roll draws more than one Loot Card, you pick which one to keep.</span></div>
     <div class="howRow"><span class="hic">&#x1F4DA;</span><span class="htxt"><b>Train:</b> spend 2 of the current floor's material for a guaranteed +1 progress, no roll. The reliable way to climb when the dice aren't cooperating.</span></div>
-    <div class="howRow"><span class="hic">&#x1F5E1;&#xFE0F;</span><span class="htxt"><b>Raid:</b> pick a target and a goal &mdash; steal 1 random material, or destroy 1 of their gear pieces. Both sides then roll 2d6 plus gear bonuses (basic gear +2, upgraded +3, an equipped accessory +1); higher score lands it, ties favor the defender. Broken Gear stays Hunt-only and never adds to a Raid roll. Go <b>all-in</b> to wager a material: win, and you keep it plus knock the target down 1 progress; lose, and they keep your stake.</span></div>
+    <div class="howRow"><span class="hic">&#x1F5E1;&#xFE0F;</span><span class="htxt"><b>Raid:</b> pick a target and steal 1 random material. Both sides then roll 2d6 plus gear bonuses (basic gear +2, upgraded +3, an equipped accessory +1); higher score lands it, ties favor the defender. Broken Gear stays Hunt-only and never adds to a Raid roll. Go <b>all-in</b> to wager a material: win, and you keep it plus knock the target down 1 progress; lose, and they keep your stake.</span></div>
     <div class="howRow"><span class="hic">&#x1F91D;</span><span class="htxt"><b>Trade:</b> a want-board, not a one-to-one proposal. Post what material you need, and any guild can pitch what they'd take for it. Accept whichever offer you like, decline one without cancelling your want, or cancel the want outright. One active want per guild at a time, free to post, pitch, decline, or accept.</span></div>
     <div class="howRow"><span class="hic">&#x1FA84;</span><span class="htxt"><b>Sabotage:</b> spend 1 material to curse a rival, their next Hunt total takes -1. Go <b>all-in</b> to spend 2 instead: the curse doubles to -2, and they lose 1 progress immediately.</span></div>
     <div class="howRow"><span class="hic">&#x1F3F9;</span><span class="htxt"><b>Blacksmith:</b> craft Basic Bow (2 Kasaka Fang, reroll a die) or Basic Sword (2 Golem Crystal, +2 total), upgrade them, or craft accessories: Shield (blocks a natural-2 penalty), Lucky Coin (+1 loot on success), Compass (+1 progress on success), Ironclad Ward (blocks the next Raid against you outright). 3 item slots, only 1 accessory at a time.</span></div>
@@ -363,7 +359,7 @@
   </div>
 </div>
 
-<script type="module" src="game.js?v=18"></script>
+<script type="module" src="game.js?v=19"></script>
 </body>
 </html>
 

@@ -1687,15 +1687,15 @@ function trainAction(){
   if((g.mat[f.name]||0)>=2){ spendMat(g,f.name,2); g.progress+=1; g.ap-=1; addLog(g.name+' trains using 2 '+f.name+', guaranteed +1 progress.'); SFX.click(); }
   else addLog(g.name+' needs 2 '+f.name+' in storage to train.');
 }
-// Raid is a deliberate strike: you pick who and what you're after, and gear
-// (weapons, Lucky Coin, Compass) adds a bonus to an opposed 2d6 roll against
-// the target's own gear-boosted roll. Broken Gear stays Hunt-only — it's
-// governed by the checkbox there, so it doesn't silently burn on a Raid too.
+// Raid is a deliberate strike: you pick a target, and gear (weapons, Lucky
+// Coin, Compass) adds a bonus to an opposed 2d6 roll against the target's
+// own gear-boosted roll. Broken Gear stays Hunt-only — it's governed by the
+// checkbox there, so it doesn't silently burn on a Raid too.
 // wagerMat: optional — going all-in stakes 1 material on the outcome. Win,
 // and the raid's normal effect lands plus the target is knocked down 1
 // progress, with the stake returned untouched. Lose, and the defender
 // keeps the stake as their prize for fighting the raid off.
-function raidAction(targetIdx, wantDestroy, wagerMat){
+function raidAction(targetIdx, wagerMat){
   const g=me();
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
   const targets=others();
@@ -1730,14 +1730,6 @@ function raidAction(targetIdx, wantDestroy, wagerMat){
   setTimeout(SFX.success, 350);
   const allInTag = wagering ? ' All-in pays off: '+t.name+' also loses 1 progress, and '+g.name+' keeps its wager.' : '';
   if(wagering && t.progress>0) t.progress-=1;
-  if(wantDestroy){
-    const tgear=t.gear||[];
-    if(!tgear.length){ addLog(g.name+' raids '+t.name+' ('+atkScore+' vs '+defScore+') hoping to break their gear, but they have none.'+allInTag, 'st'); return; }
-    const piece=tgear[Math.floor(Math.random()*tgear.length)];
-    t.gear=tgear.filter(function(x){ return x!==piece; });
-    addLog(g.name+' raids '+t.name+' ('+atkScore+' vs '+defScore+') and destroys their '+piece+'!'+allInTag, 'st');
-    return;
-  }
   const s=steal(t,g);
   addLog((s
     ? (g.name+' raids '+t.name+': '+atkScore+' vs '+defScore+', stealing 1 '+s+'.')
@@ -1858,16 +1850,15 @@ document.getElementById('btnHunt').onclick=function(){
 document.getElementById('btnTrain').onclick=function(){ if(!isMyTurn()) return; withState(trainAction); };
 document.getElementById('btnRaidToggle').onclick=function(){
   showOnlyPanel('raidPanel'); refreshTargetSelects();
-  coachTip('raid', document.getElementById('raidGoal'),
-    'Pick your goal before you roll: stealing takes a random material, destroying breaks one piece of their gear. The opposed roll (yours vs theirs, gear included) decides whether it lands. Feeling bold? Go all-in below to wager a material for a bigger payoff, at the risk of losing it.');
+  coachTip('raid', document.getElementById('raidTarget'),
+    'Pick a target and steal 1 random material. The opposed roll (yours vs theirs, gear included) decides whether it lands. Feeling bold? Go all-in below to wager a material for a bigger payoff, at the risk of losing it.');
 };
 document.getElementById('btnCancelRaid').onclick=function(){ document.getElementById('raidPanel').classList.remove('show'); };
 document.getElementById('btnSendRaid').onclick=function(){
   if(!isMyTurn()) return;
   const targetIdx=parseInt(document.getElementById('raidTarget').value,10);
-  const wantDestroy=document.getElementById('raidGoal').value==='destroy';
   const wagerMat=document.getElementById('raidWagerToggle').checked ? document.getElementById('raidWagerMat').value : null;
-  withState(function(){ raidAction(targetIdx, wantDestroy, wagerMat); });
+  withState(function(){ raidAction(targetIdx, wagerMat); });
   document.getElementById('raidPanel').classList.remove('show');
   document.getElementById('raidWagerToggle').checked=false;
   document.getElementById('raidWagerRow').style.display='none';
@@ -2073,15 +2064,14 @@ function botStep(){
   }
   if((g.mat[f.name]||0)>=2 && Math.random()<0.5){ withState(trainAction); return; }
   if(Math.random()<0.15 && others().length){
-    // prefer a target with something actually worth taking (material or gear)
-    const viable=others().filter(function(o){ return stockKeys(o.g).length || (o.g.gear||[]).length; });
+    // prefer a target with something actually worth taking (material)
+    const viable=others().filter(function(o){ return stockKeys(o.g).length; });
     const pool=viable.length?viable:others();
     const pick=pool[Math.floor(Math.random()*pool.length)];
-    const wantDestroy=(pick.g.gear||[]).length>=2 || (!stockKeys(pick.g).length && (pick.g.gear||[]).length>0);
     // going all-in risks a real loss, so only do it with stock to spare
     const spareKeys=stockKeys(g);
     const wagerMat = spareKeys.length>=2 && Math.random()<0.35 ? spareKeys[Math.floor(Math.random()*spareKeys.length)] : null;
-    withState(function(){ raidAction(pick.i, wantDestroy, wagerMat); });
+    withState(function(){ raidAction(pick.i, wagerMat); });
     return;
   }
   if(Math.random()<0.1 && others().length && stockKeys(g).length){
