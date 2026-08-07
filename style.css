@@ -390,6 +390,24 @@ body.in-game .heroWrap { display: none; }
     margin-right: 8px;
   }
 
+  .slotIdentity {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .slotBtn .ic.art {
+    display: inline-block;
+    width: 22px;
+    height: 22px;
+    --tint: currentColor;
+  }
+
+  .slotName {
+    font-family: 'Cinzel', serif;
+    font-weight: 600;
+  }
+
   .slotBtn[disabled] {
     opacity: 0.45;
     cursor: not-allowed;
@@ -459,6 +477,12 @@ body.in-game .heroWrap { display: none; }
   .colorOpt.sel {
     border-color: #fff;
     box-shadow: 0 0 0 1px #fff, 0 0 16px currentColor;
+  }
+
+  .colorOpt.taken {
+    opacity: 0.3;
+    cursor: not-allowed;
+    filter: grayscale(0.6);
   }
 
   #game {
@@ -1518,11 +1542,20 @@ body.in-game .heroWrap { display: none; }
     align-self: stretch;
   }
 
-  .lootCard .lootArt.broken {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 30px;
+  .brokenArt {
+    position: relative;
+    display: inline-block;
+  }
+
+  .brokenBase {
+    position: absolute;
+    inset: 0;
+  }
+
+  .brokenOverlay {
+    position: absolute;
+    inset: 0;
+    background: center/contain no-repeat var(--art);
   }
 
   .lootCard .lootName {

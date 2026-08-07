@@ -53,8 +53,19 @@ const GEAR={
   'Broken Gear':    { type:'broken', cost:{}, desc:'Single use: +2 to one hunt, then it breaks.' }
 };
 const GEAR_ICON={ 'Basic Bow':'\u{1F3F9}', 'Upgraded Bow':'\u{1F3F9}✨', 'Basic Sword':'⚔️', 'Upgraded Sword':'\u{1F5E1}️', 'Shield':'\u{1F6E1}️', 'Lucky Coin':'\u{1F340}', 'Compass':'\u{1F9ED}', 'Ironclad Ward':'\u{1F6E1}️✨', 'Broken Gear':'\u{1FA93}' };
-const GEAR_ART={ 'Basic Bow':'icon_basic_bow', 'Basic Sword':'icon_basic_sword', 'Compass':'icon_compass', 'Lucky Coin':'icon_lucky_coin', 'Shield':'icon_shield' };
-function gearIcon(name){
+const GEAR_ART={ 'Basic Bow':'icon_basic_bow', 'Upgraded Bow':'icon_bow_upgraded', 'Basic Sword':'icon_basic_sword', 'Upgraded Sword':'icon_sword_upgraded', 'Compass':'icon_compass', 'Lucky Coin':'icon_lucky_coin', 'Shield':'icon_shield' };
+function pseudoHash(str){ let h=0; str=String(str); for(let i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))>>>0; } return h; }
+// Broken Gear has no fixed shape of its own — each piece shows a randomly
+// (but stably, per seed) picked base weapon/accessory icon with the cracked
+// overlay layered on top, so the same piece doesn't change look every render
+function brokenGearInner(seed){
+  const pool=Object.keys(GEAR_ART);
+  const base=GEAR_ART[pool[pseudoHash(seed)%pool.length]];
+  return '<span class="brokenBase art ink" style="--art:'+art('icons',base)+'"></span>'+
+    '<span class="brokenOverlay" style="--art:'+art('icons','broken_gear_overlay')+'"></span>';
+}
+function gearIcon(name, seed){
+  if(name==='Broken Gear') return '<span class="ic art brokenArt">'+brokenGearInner(seed!==undefined?seed:name)+'</span>';
   const file=GEAR_ART[name];
   if(!file) return '<span class="ic">'+(GEAR_ICON[name]||'&#x1F392;')+'</span>';
   return '<span class="ic art ink" style="--art:'+art('icons',file)+'"></span>';
@@ -175,6 +186,7 @@ function showGame(){
   document.body.classList.add('in-game');
   document.getElementById('btnPause').style.display = LOCAL_MODE ? '' : 'none';
   document.getElementById('btnSpeed').style.display = LOCAL_MODE ? '' : 'none';
+  document.getElementById('btnEndGame').style.display = (LOCAL_MODE || myGuildIndex===0) ? '' : 'none';
   if(!tutorialPrompted){
     tutorialPrompted=true;
     document.getElementById('tutorialPromptOverlay').classList.add('show');
@@ -333,12 +345,24 @@ COLOR_OPTIONS.forEach(function(opt,i){
   b.style.color=opt.color;
   b.innerHTML='<span class="ic art" style="--art:'+art('guild',i+1)+'"></span><span class="nm">'+opt.name+'</span>';
   b.onclick=function(){
+    if(b.classList.contains('taken')) return;
     identityColorIdx=i;
     Array.from(colorGrid.children).forEach(function(c){c.classList.remove('sel');});
     b.classList.add('sel');
   };
   colorGrid.appendChild(b);
 });
+// disables colors already claimed by earlier seats in this same local
+// pass-and-play setup, so two guilds can't end up sharing an identity
+function refreshColorGridAvailability(usedColors){
+  const firstFree=COLOR_OPTIONS.findIndex(function(o){ return usedColors.indexOf(o.color)<0; });
+  identityColorIdx = firstFree>=0 ? firstFree : 0;
+  Array.from(colorGrid.children).forEach(function(c,i){
+    const taken=usedColors.indexOf(COLOR_OPTIONS[i].color)>=0;
+    c.classList.toggle('taken', taken);
+    c.classList.toggle('sel', i===identityColorIdx);
+  });
+}
 function openIdentity(flow){
   pendingFlow=flow;
   colorGrid.style.display='';
@@ -346,8 +370,7 @@ function openIdentity(flow){
   document.getElementById('identityDesc').textContent='Pick a name and a color for your guild.';
   document.getElementById('identityName').value='';
   document.getElementById('identityErr').textContent='';
-  identityColorIdx=0;
-  Array.from(colorGrid.children).forEach(function(c,i){c.classList.toggle('sel', i===0);});
+  refreshColorGridAvailability([]);
   showScreen('screenIdentity');
 }
 let localSetupQueue=[];
@@ -359,8 +382,7 @@ function openLocalIdentityStep(){
   document.getElementById('identityDesc').textContent = seat===0 ? 'Pick a name and a color for your guild.' : 'Hand the device to that friend, then have them pick a name and color.';
   document.getElementById('identityName').value='';
   document.getElementById('identityErr').textContent='';
-  identityColorIdx=0;
-  Array.from(colorGrid.children).forEach(function(c,i){c.classList.toggle('sel', i===0);});
+  refreshColorGridAvailability(localSetupResults.map(function(r){ return r.color; }));
   showScreen('screenIdentity');
 }
 let pendingJoinSlot=null;
@@ -568,13 +590,18 @@ function renderSlotPicker(s){
     const b=document.createElement('button');
     b.className='slotBtn';
     const taken = !!g.claimedBy;
-    b.innerHTML='<span><span class="dotc" style="background:'+g.color+'"></span>'+g.name+'</span><span class="tag'+(g.isBot?' bot':'')+'">'+(g.isBot?'AI':(taken?'taken':'open'))+'</span>';
+    const colorIdx=COLOR_OPTIONS.findIndex(function(o){ return o.color===g.color; });
+    const colorName = colorIdx>=0 ? COLOR_OPTIONS[colorIdx].name : g.name;
+    const icon = colorIdx>=0
+      ? '<span class="ic art" style="--art:'+art('guild',colorIdx+1)+';color:'+g.color+'"></span>'
+      : '<span class="dotc" style="background:'+g.color+'"></span>';
+    b.innerHTML='<span class="slotIdentity">'+icon+'<span class="slotName" style="color:'+g.color+'">'+colorName+'</span></span><span class="tag'+(g.isBot?' bot':'')+'">'+(g.isBot?'AI':(taken?'taken':'open'))+'</span>';
     if(taken) b.disabled=true;
     b.onclick=async function(){
       const fresh=await get(roomRef());
       const fs=fresh.val();
       if(fs.guilds[i].claimedBy){ renderSlotPicker(fs); return; }
-      openJoinIdentity(i, fs.guilds[i].name);
+      openJoinIdentity(i, colorName);
     };
     row.appendChild(b);
   });
@@ -639,7 +666,24 @@ function clearLocalStorageRoom(){
   if(roomCode){ localStorage.removeItem('ascension_slot_'+roomCode); }
   localStorage.removeItem('ascension_room');
 }
-function leaveOnline(){
+async function leaveOnline(midGame){
+  if(roomCode && myGuildIndex!==null){
+    try{
+      const fresh=(await get(roomRef())).val();
+      const g=fresh && fresh.guilds[myGuildIndex];
+      if(g){
+        if(midGame){
+          g.isBot=true;
+          g.claimedBy='bot';
+          fresh.log=fresh.log||[];
+          fresh.log.push({t:g.name+' left — now controlled by AI.', cls:''});
+        } else {
+          g.claimedBy=null;
+        }
+        await set(roomRef(), fresh);
+      }
+    } catch(e){ console.error(e); }
+  }
   if(roomCode){ try{ off(roomRef()); }catch(e){} }
   clearLocalStorageRoom();
   roomCode=null; myGuildIndex=null; state=null;
@@ -647,7 +691,7 @@ function leaveOnline(){
 }
 function leaveGame(){
   if(LOCAL_MODE){ LOCAL_MODE=false; state=null; showScreen('screenHome'); }
-  else { leaveOnline(); }
+  else { leaveOnline(true); }
 }
 function restartLocalGame(){
   if(!LOCAL_MODE || !state) return;
@@ -663,12 +707,13 @@ function restartLocalGame(){
   state.log=[{t:'New expedition, same guilds.', cls:''}];
   render();
 }
-document.getElementById('btnLeaveLobby').onclick=leaveOnline;
+document.getElementById('btnLeaveLobby').onclick=function(){ leaveOnline(false); };
 document.getElementById('btnLeaveGame').onclick=function(){
   if(confirm('Leave this game and return to the home screen?')) leaveGame();
 };
 document.getElementById('btnEndGame').onclick=function(){
   if(!state || (state.winner!==null && state.winner!==undefined)) return;
+  if(!LOCAL_MODE && myGuildIndex!==0){ addLog('Only the host can call the game.'); return; }
   if(confirm("Call the game now? Standings are ranked by floor reached, then progress, then materials/gear on hand — this ends it for everyone.")) withState(concludeGame);
 };
 
@@ -677,11 +722,17 @@ document.getElementById('btnEndGame').onclick=function(){
   const savedSlot=localStorage.getItem('ascension_slot_'+savedRoom);
   if(savedRoom && savedSlot!==null){
     get(ref(db,'rooms/'+savedRoom)).then(function(snap){
-      if(snap.exists()){
+      const val=snap.exists() ? snap.val() : null;
+      const concluded = val && val.winner!==null && val.winner!==undefined;
+      if(val && !concluded){
         LOCAL_MODE=false;
         roomCode=savedRoom; myGuildIndex=parseInt(savedSlot,10);
         attachListener();
-      } else { showScreen('screenHome'); }
+      } else {
+        localStorage.removeItem('ascension_slot_'+savedRoom);
+        localStorage.removeItem('ascension_room');
+        showScreen('screenHome');
+      }
     }).catch(function(){ showScreen('screenHome'); });
   } else { showScreen('screenHome'); }
 })();
@@ -991,9 +1042,9 @@ function renderPlacemat(){
   Object.keys(prevMats).forEach(function(k){ delete prevMats[k]; });
   keys.forEach(function(k){ prevMats[k]=g.mat[k]; });
 
-  const gearChips=gear.map(function(name){
+  const gearChips=gear.map(function(name,i){
     const fresh=prevGear.indexOf(name)<0;
-    return '<div class="matCard gear'+(fresh?' fresh':'')+'" style="--tint:var(--violet)">'+gearIcon(name)+'<span class="mcName">'+name+'</span></div>';
+    return '<div class="matCard gear'+(fresh?' fresh':'')+'" style="--tint:var(--violet)">'+gearIcon(name,g.name+'|'+i)+'<span class="mcName">'+name+'</span></div>';
   });
   prevGear=gear.slice();
   if(matChips.concat(gearChips).some(function(c){ return c.indexOf('fresh')>=0; })) SFX.gain();
@@ -1111,11 +1162,11 @@ function throwDie(el, finalN){
   }, 65);
 }
 
-function lootCard(loot){
+function lootCard(loot, seed){
   if(!loot) return '';
   const face = loot.kind==='mat'
     ? '<span class="lootArt art" style="--art:'+art('mat',loot.floor+1)+'"></span>'
-    : '<span class="lootArt broken">&#x1FA93;</span>';
+    : '<span class="lootArt brokenArt">'+brokenGearInner(seed!==undefined?seed:loot.name)+'</span>';
   const tint = loot.kind==='mat' ? FLOOR_TINT[loot.floor] : 'var(--coral)';
   return '<div class="lootCard" style="--tint:'+tint+'"><span class="lootTag">Loot</span>'+face+'<span class="lootName">'+loot.name+'</span></div>';
 }
@@ -1151,7 +1202,7 @@ function renderDice(){
     '<div class="diceRow">'+diceFace(h.d1,'','dc1')+'<span class="plus">+</span>'+diceFace(h.d2,'','dc2')+'</div>'+
     (h.snake ? '<p style="font-size:12px;color:var(--text-dim);">snake eyes</p>' : '<p style="font-size:12px;color:var(--text-dim);">total '+h.total+' vs DR '+h.dr+'</p>')+
     '<p class="resultLine '+resultCls+'">'+resultText+'</p>'+
-    (showLoot ? '<div class="lootRevealRow">'+h.loot.map(lootCard).join('')+'</div>' : '');
+    (showLoot ? '<div class="lootRevealRow">'+h.loot.map(function(loot,i){ return lootCard(loot, h.seq+'|'+i); }).join('')+'</div>' : '');
   
   if(key!==lastRollKeyForSfx){
     lastRollKeyForSfx=key;
@@ -1335,8 +1386,8 @@ function renderGearSwap(){
   const ps=state.pendingGearSwap;
   if(ps && ps.guildIdx===myActiveIdx() && !state.guilds[ps.guildIdx].isBot){
     banner.classList.add('show');
-    const optsHtml=ps.current.map(function(name){
-      return '<button class="gsOption" type="button" data-name="'+name+'">'+gearIcon(name)+' Drop '+name+'</button>';
+    const optsHtml=ps.current.map(function(name,i){
+      return '<button class="gsOption" type="button" data-name="'+name+'">'+gearIcon(name,ps.guildIdx+'|'+i)+' Drop '+name+'</button>';
     }).join('');
     banner.innerHTML = '<div class="lcTitle">Gear full</div><div class="lcSub">Keep both current pieces and leave the new Broken Gear, or drop one to make room.</div>'+
       '<div class="lcOptions">'+optsHtml+'</div>'+
@@ -1359,7 +1410,7 @@ function renderLootChoice(){
       const preview = opt.kind==='broken'
         ? {kind:'broken', name:'Broken Gear'}
         : {kind:'mat', floor:opt.floorIdx, name:floors[opt.floorIdx].name};
-      return '<button class="lcOption" type="button" data-i="'+i+'">'+lootCard(preview)+'</button>';
+      return '<button class="lcOption" type="button" data-i="'+i+'">'+lootCard(preview,i)+'</button>';
     }).join('');
     banner.innerHTML = '<div class="lcTitle">Extra loot — keep which one'+(pl.options.length>1?'s':'')+'?</div><div class="lcOptions">'+optionsHtml+'</div>'+
       (pl.options.length>1 ? '<div class="btnRow" style="margin-top:10px;"><button class="ghost-btn" id="btnSkipLoot">Leave the rest</button></div>' : '');
