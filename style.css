@@ -2236,6 +2236,74 @@ p.subtitle,
     border-color: var(--gold);
   }
 
+  .duelType {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: var(--gold);
+    margin-bottom: 10px;
+  }
+
+  .duelSides {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+  }
+
+  .duelSide {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .duelName {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-hi);
+    margin-bottom: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .duelSide .diceRow {
+    gap: 4px;
+  }
+
+  .duelSide .diceCube {
+    width: 36px;
+    height: 36px;
+  }
+
+  .duelScore {
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold);
+  }
+
+  .duelVs {
+    font-family: 'Cinzel', serif;
+    font-size: 15px;
+    color: var(--text-dim);
+    flex: 0 0 auto;
+  }
+
+  .duelResultText {
+    margin: 14px 0 0;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-hi);
+  }
+
+  .duelResultText.win {
+    color: var(--gold);
+  }
+
+  .duelResultText.lose {
+    color: var(--text-mid);
+  }
+
   .transmutePicker {
     display: flex;
     flex-direction: column;
