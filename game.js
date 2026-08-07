@@ -28,7 +28,7 @@ const KEYS={
   4: {name:'Kaisel Ward',      art:2, cost:{'Orc Tusk':1,'Oracle Wisp':1}},
   5: {name:"Sovereign's Bane", art:3, cost:{'Kaisel Scale':1,'Kasaka Fang':1}}
 };
-const CAP=4, CAMP_LIMIT=4, GEAR_SLOTS=3, TRANSMUTE_COST=3, LOOT_REVEAL_MS=4500;
+const CAP=4, CAMP_LIMIT=4, GEAR_SLOTS=3, TRANSMUTE_COST=3, LOOT_REVEAL_MS=4500, DUEL_REVEAL_MS=4200;
 function poolCapFor(n){ return 5*n; }
 const LOOT_DECK=['mat','mat','mat','mat','mat','mat','mat','mat','mat','mat','broken','broken'];
 const PALETTE=['#4fd8ff','#a480ff','#e0b756','#ff8b7a'];
