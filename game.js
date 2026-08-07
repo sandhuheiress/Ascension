@@ -190,49 +190,72 @@ document.getElementById('btnTutorialYes').onclick=function(){ resolveTutorialCho
 document.getElementById('btnTutorialNo').onclick=function(){ resolveTutorialChoice(false); };
 
 let seatingRollAckedId=null;
-function performSeatingRoll(){ rollForFirstPlayer(state); }
 let seatingRollSoundedId=null;
 function renderSeatingRollOverlay(){
   const overlay=document.getElementById('seatingRollOverlay');
   if(!state || !state.started || !tutorialChoiceMade){ overlay.classList.remove('show'); return; }
   const sr=state.seatingRoll;
-  if(sr && sr.id===seatingRollAckedId){ overlay.classList.remove('show'); return; }
+  if(!sr || (sr.done && sr.id===seatingRollAckedId)){ overlay.classList.remove('show'); return; }
   overlay.classList.add('show');
-  const diceBox=document.getElementById('seatingRollDice');
+  document.getElementById('seatingRollDice').style.display='none';
   const list=document.getElementById('seatingRollList');
   const winnerEl=document.getElementById('seatingRollWinner');
   const action=document.getElementById('seatingRollAction');
-  if(!sr){
+
+  const rolls=sr.rolls||{};
+  if(!sr.done){
     document.getElementById('seatingRollHeading').textContent='Who goes first?';
-    document.getElementById('seatingRollDesc').textContent="Everyone rolls 2d6 — highest total takes the first turn.";
+    document.getElementById('seatingRollDesc').textContent='Each guild rolls their own 2d6 — highest total takes the first turn.';
     document.getElementById('seatingRollDesc').style.display='';
-    diceBox.style.display='flex';
-    diceBox.innerHTML=diceFace(1,'idle')+diceFace(1,'idle');
-    list.innerHTML='';
     winnerEl.textContent='';
-    action.innerHTML='<button class="glow-btn" id="btnRollSeating">Roll for first player</button>';
-    document.getElementById('btnRollSeating').onclick=function(){ SFX.roll(); withState(performSeatingRoll); };
+    action.innerHTML='';
+    list.innerHTML = state.guilds.map(function(g,i){
+      const rolled = rolls[i]!==undefined;
+      const canRoll = !rolled && !g.isBot && (LOCAL_MODE || i===myGuildIndex);
+      const right = rolled
+        ? '<span class="srVal">'+rolls[i]+'</span>'
+        : (canRoll
+          ? '<button class="glow-btn srRollBtn" data-i="'+i+'" style="padding:4px 16px;font-size:12px;">Roll</button>'
+          : '<span class="srVal" style="color:var(--text-dim);font-size:11px;">'+(g.isBot?'rolling…':'waiting…')+'</span>');
+      return '<div class="srRow"><span class="srDot" style="background:'+g.color+'"></span><span class="srName">'+g.name+'</span>'+right+'</div>';
+    }).join('');
+    list.querySelectorAll('.srRollBtn').forEach(function(btn){
+      btn.onclick=function(){
+        const idx=parseInt(btn.dataset.i,10);
+        SFX.roll();
+        withState(function(){ rollMySeat(idx); });
+      };
+    });
     return;
   }
-  diceBox.style.display='none';
+
   document.getElementById('seatingRollHeading').textContent='Rolling for first player…';
   document.getElementById('seatingRollDesc').style.display='none';
-  list.innerHTML = sr.results.map(function(r,i){
-    return '<div class="srRow" style="animation-delay:'+(i*0.22)+'s;">'+
-      '<span class="srDot" style="background:'+r.color+'"></span><span class="srName">'+r.name+'</span><span class="srVal">'+r.roll+'</span></div>';
+  list.innerHTML = state.guilds.map(function(g,i){
+    return '<div class="srRow"><span class="srDot" style="background:'+g.color+'"></span><span class="srName">'+g.name+'</span><span class="srVal">'+rolls[i]+'</span></div>';
   }).join('');
-  winnerEl.textContent=sr.results[sr.winnerIdx].name+' goes first!';
-  const revealDelay=sr.results.length*0.22+0.15;
-  winnerEl.style.animationDelay=revealDelay+'s';
+  winnerEl.textContent=state.guilds[sr.winnerIdx].name+' goes first!';
   if(sr.id!==seatingRollSoundedId){
     seatingRollSoundedId=sr.id;
-    setTimeout(SFX.climb, revealDelay*1000);
+    SFX.climb();
   }
   action.innerHTML='<button class="glow-btn" id="btnSeatingRollGo">Start climbing</button>';
   document.getElementById('btnSeatingRollGo').onclick=function(){
     seatingRollAckedId=sr.id;
     render();
   };
+}
+let botSeatRollScheduled=false;
+function maybeBotSeatingRoll(){
+  if(!state || !isBotDriver()) return;
+  if(botSeatRollScheduled) return;
+  const sr=state.seatingRoll;
+  if(!sr || sr.done) return;
+  const rolls=sr.rolls||{};
+  const idx=state.guilds.findIndex(function(g,i){ return g.isBot && rolls[i]===undefined; });
+  if(idx<0) return;
+  botSeatRollScheduled=true;
+  setTimeout(function(){ botSeatRollScheduled=false; withState(function(){ rollMySeat(idx); }); }, BOT_SPEEDS[botSpeedIdx]);
 }
 
 function setPaused(p){
@@ -318,6 +341,7 @@ COLOR_OPTIONS.forEach(function(opt,i){
 });
 function openIdentity(flow){
   pendingFlow=flow;
+  colorGrid.style.display='';
   document.getElementById('identityHeading').textContent='Name your guild';
   document.getElementById('identityDesc').textContent='Pick a name and a color for your guild.';
   document.getElementById('identityName').value='';
@@ -330,12 +354,25 @@ let localSetupQueue=[];
 let localSetupResults=[];
 function openLocalIdentityStep(){
   const seat=localSetupQueue[0];
+  colorGrid.style.display='';
   document.getElementById('identityHeading').textContent = seat===0 ? 'Name your guild' : 'Pass the device — Seat '+String.fromCharCode(65+seat);
   document.getElementById('identityDesc').textContent = seat===0 ? 'Pick a name and a color for your guild.' : 'Hand the device to that friend, then have them pick a name and color.';
   document.getElementById('identityName').value='';
   document.getElementById('identityErr').textContent='';
   identityColorIdx=0;
   Array.from(colorGrid.children).forEach(function(c,i){c.classList.toggle('sel', i===0);});
+  showScreen('screenIdentity');
+}
+let pendingJoinSlot=null;
+function openJoinIdentity(slotIdx, defaultName){
+  pendingFlow='join';
+  pendingJoinSlot=slotIdx;
+  colorGrid.style.display='none';
+  document.getElementById('identityHeading').textContent='Name your guild';
+  document.getElementById('identityDesc').textContent='Pick a name for your guild.';
+  document.getElementById('identityName').value='';
+  document.getElementById('identityName').placeholder=defaultName||'Guild name';
+  document.getElementById('identityErr').textContent='';
   showScreen('screenIdentity');
 }
 document.getElementById('btnLocalNext').onclick=function(){
@@ -346,7 +383,9 @@ document.getElementById('btnLocalNext').onclick=function(){
   openLocalIdentityStep();
 };
 document.getElementById('btnCreateNext').onclick=function(){ openIdentity('online'); };
-document.getElementById('btnBackFromIdentity').onclick=function(){ showScreen(pendingFlow==='local' ? 'screenHome' : 'screenCreate'); };
+document.getElementById('btnBackFromIdentity').onclick=function(){
+  showScreen(pendingFlow==='local' ? 'screenHome' : (pendingFlow==='join' ? 'screenSlots' : 'screenCreate'));
+};
 
 function colorsForRoom(n, chosenIdx){
   const pool=COLOR_OPTIONS.map(function(o){return o.color;});
@@ -385,11 +424,40 @@ document.getElementById('btnIdentityGo').onclick=async function(){
       }
     }
     state.started=true;
-    state.turnStartedAt=Date.now();
+    state.seatingRoll={ id:'sr'+Date.now()+Math.floor(Math.random()*10000), rolls:{} };
     state.log=[{t:(friendCount? 'Local pass-and-play game started.' : 'Practice game started.'), cls:''}];
     document.getElementById('roomTag').textContent = friendCount ? 'Local pass-and-play' : 'Local practice game';
     showGame();
     render();
+    return;
+  }
+
+  if(pendingFlow==='join'){
+    const btn=document.getElementById('btnIdentityGo');
+    btn.disabled=true; btn.textContent='Joining...';
+    try{
+      const fresh=await get(roomRef());
+      const fs=fresh.val();
+      if(!fs || fs.guilds[pendingJoinSlot].claimedBy){
+        errEl.textContent='That slot was just taken — pick another.';
+        renderSlotPicker(fs);
+        showScreen('screenSlots');
+        return;
+      }
+      fs.guilds[pendingJoinSlot].name=name.slice(0,18);
+      fs.guilds[pendingJoinSlot].claimedBy=deviceId;
+      await set(roomRef(), fs);
+      myGuildIndex=pendingJoinSlot;
+      localStorage.setItem('ascension_room', roomCode);
+      localStorage.setItem('ascension_slot_'+roomCode, String(pendingJoinSlot));
+      attachListener();
+    } catch(e){
+      console.error(e);
+      errEl.textContent = 'Could not join: ' + (e && e.message ? e.message : e);
+      showScreen('screenIdentity');
+    } finally {
+      btn.disabled=false; btn.textContent='Next';
+    }
     return;
   }
 
@@ -506,23 +574,30 @@ function renderSlotPicker(s){
       const fresh=await get(roomRef());
       const fs=fresh.val();
       if(fs.guilds[i].claimedBy){ renderSlotPicker(fs); return; }
-      const nm=prompt('Name your guild:', fs.guilds[i].name);
-      if(nm===null) return;
-      if(nm.trim()) fs.guilds[i].name=nm.trim().slice(0,18);
-      fs.guilds[i].claimedBy=deviceId;
-      await set(roomRef(), fs);
-      myGuildIndex=i;
-      localStorage.setItem('ascension_room', roomCode);
-      localStorage.setItem('ascension_slot_'+roomCode, String(i));
-      attachListener();
+      openJoinIdentity(i, fs.guilds[i].name);
     };
     row.appendChild(b);
   });
 }
 
+// Firebase strips empty objects/arrays on write (an empty {} or [] is
+// indistinguishable from "no data" to it), so a guild with no materials yet,
+// no gear yet, or a fresh tradeWants/rolls map can come back from a read as
+// undefined instead of {}/[] . Every state read from the room needs this
+// restored before anything downstream assumes those fields exist.
+function normalizeState(s){
+  if(!s) return s;
+  (s.guilds||[]).forEach(function(g){
+    g.mat = g.mat || {};
+    g.gear = g.gear || [];
+  });
+  s.tradeWants = s.tradeWants || [];
+  if(s.seatingRoll) s.seatingRoll.rolls = s.seatingRoll.rolls || {};
+  return s;
+}
 function attachListener(){
   onValue(roomRef(), function(snap){
-    state=snap.val();
+    state=normalizeState(snap.val());
     if(!state) return;
     if(!state.started){ renderLobby(); showScreen('screenLobby'); }
     else { document.getElementById('roomTag').innerHTML='Room <b>'+roomCode+'</b>'; showGame(); render(); }
@@ -533,7 +608,7 @@ function renderLobby(){
   document.getElementById('lobbyCode').textContent=roomCode;
   const row=document.getElementById('lobbySlots');
   row.innerHTML=state.guilds.map(function(g,i){
-    const you = g.claimedBy===deviceId;
+    const you = i===myGuildIndex;
     const tag = g.isBot ? 'AI' : (g.claimedBy?'ready':'waiting');
     return '<div class="slotBtn"><span><span class="dotc" style="background:'+g.color+'"></span>'+g.name+(you?' (you)':'')+'</span><span class="tag'+(g.isBot?' bot':'')+'">'+tag+'</span></div>';
   }).join('');
@@ -546,7 +621,7 @@ function renderLobby(){
 document.getElementById('btnStartGame').onclick=async function(){
   const s=(await get(roomRef())).val();
   s.started=true;
-  s.turnStartedAt=Date.now();
+  s.seatingRoll={ id:'sr'+Date.now()+Math.floor(Math.random()*10000), rolls:{} };
   await set(roomRef(), s);
 };
 document.getElementById('btnAddBot').onclick=async function(){
@@ -582,7 +657,7 @@ function restartLocalGame(){
     g.name=seats[i].name; g.color=seats[i].color; g.isBot=seats[i].isBot; g.claimedBy=seats[i].claimedBy;
   });
   state.started=true;
-  state.turnStartedAt=Date.now();
+  state.seatingRoll={ id:'sr'+Date.now()+Math.floor(Math.random()*10000), rolls:{} };
   lastHumanSeatLocal=null;
   seatingRollAckedId=null;
   state.log=[{t:'New expedition, same guilds.', cls:''}];
@@ -641,16 +716,19 @@ function returnMat(name,qty){
 }
 function spendMat(g,name,qty){ g.mat[name]-=qty; if(g.mat[name]<=0) delete g.mat[name]; returnMat(name,qty); }
 
-function rollForFirstPlayer(s){
+function rollMySeat(idx){
+  const sr=state.seatingRoll;
+  if(!sr || sr.done) return;
+  sr.rolls=sr.rolls||{};
+  if(sr.rolls[idx]!==undefined) return;
+  sr.rolls[idx]=2+Math.floor(Math.random()*6)+Math.floor(Math.random()*6);
+  if(Object.keys(sr.rolls).length<state.guilds.length) return;
   let best=-1, first=0;
-  const results=s.guilds.map(function(g,i){
-    const r=2+Math.floor(Math.random()*6)+Math.floor(Math.random()*6);
-    if(r>best){ best=r; first=i; }
-    return {name:g.name, color:g.color, roll:r};
-  });
-  s.current=first; s.round=1; s.turnStartedAt=Date.now();
-  s.seatingRoll={ id:'sr'+Date.now()+Math.floor(Math.random()*10000), results:results, winnerIdx:first };
-  s.log.unshift({t:'Seating roll: '+results.map(function(r){return r.name+' '+r.roll;}).join(', ')+'. '+s.guilds[first].name+' goes first.', cls:''});
+  state.guilds.forEach(function(g,i){ if(sr.rolls[i]>best){ best=sr.rolls[i]; first=i; } });
+  sr.done=true;
+  sr.winnerIdx=first;
+  state.current=first; state.round=1; state.turnStartedAt=Date.now();
+  state.log.unshift({t:'Seating roll: '+state.guilds.map(function(g,i){return g.name+' '+sr.rolls[i];}).join(', ')+'. '+state.guilds[first].name+' goes first.', cls:''});
 }
 
 function canAfford(g,cost){ return Object.keys(cost).every(function(m){ return (g.mat[m]||0)>=cost[m]; }); }
@@ -685,7 +763,7 @@ async function withState(fn){
     return;
   }
   const fresh=(await get(roomRef())).val();
-  state=fresh;
+  state=normalizeState(fresh);
   fn();
   await pushState();
 }
@@ -703,7 +781,7 @@ function render(){
     const activeIdx=state.current;
     const activeGf=floors[active.idx];
     const keys=stockKeys(active);
-    const activeYou = LOCAL_MODE ? !active.isBot : active.claimedBy===deviceId;
+    const activeYou = LOCAL_MODE ? !active.isBot : activeIdx===myGuildIndex;
     const gameWon = state.winner!==null && state.winner!==undefined;
     const placematShowing = isMyTurn() && !active.isBot && !gameWon;
     const fullPanel = '<div class="guildPanel glass" style="border-left-color:'+active.color+(gameWon?'':';box-shadow:0 0 16px '+active.color+'44')+';">'+
@@ -721,7 +799,7 @@ function render(){
 
     const rivalChips = others().map(function(o){
       const g=o.g;
-      const you = g.claimedBy===deviceId;
+      const you = !LOCAL_MODE && o.i===myGuildIndex;
       return '<div class="rivalChip" style="border-color:'+g.color+'66;">'+
         '<span class="dot" style="background:'+g.color+';box-shadow:0 0 6px '+g.color+';"></span>'+
         '<span class="rname">'+g.name+'</span>'+
@@ -833,6 +911,7 @@ function render(){
   renderDice();
   renderDuel();
   if(document.getElementById('blacksmithPanel').classList.contains('show')) renderBlacksmithShop();
+  maybeBotSeatingRoll();
   maybeBotContinue();
 }
 
