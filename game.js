@@ -177,14 +177,15 @@ setInterval(updateTurnTimerDisplay, 1000);
 
 let tutorialOn=false, tutorialPrompted=false, tutorialChoiceMade=false, gamePaused=false;
 const seenTips=new Set();
+function isPaused(){ return LOCAL_MODE ? gamePaused : !!(state && state.paused); }
 function isFrozen(){
-  return gamePaused || !tutorialChoiceMade || document.getElementById('seatingRollOverlay').classList.contains('show');
+  return isPaused() || !tutorialChoiceMade || document.getElementById('seatingRollOverlay').classList.contains('show');
 }
 function showGame(){
   screens().forEach(function(s){ document.getElementById(s).style.display='none'; });
   document.getElementById('game').style.display='flex';
   document.body.classList.add('in-game');
-  document.getElementById('btnPause').style.display = LOCAL_MODE ? '' : 'none';
+  document.getElementById('btnPause').style.display = (LOCAL_MODE || myGuildIndex===0) ? '' : 'none';
   document.getElementById('btnSpeed').style.display = LOCAL_MODE ? '' : 'none';
   document.getElementById('btnEndGame').style.display = (LOCAL_MODE || myGuildIndex===0) ? '' : 'none';
   if(!tutorialPrompted){
@@ -269,15 +270,47 @@ function maybeBotSeatingRoll(){
   botSeatRollScheduled=true;
   setTimeout(function(){ botSeatRollScheduled=false; withState(function(){ rollMySeat(idx); }); }, BOT_SPEEDS[botSpeedIdx]);
 }
+let botRaidRollScheduled=false;
+function maybeBotRaidRoll(){
+  if(!state || !isBotDriver()) return;
+  if(botRaidRollScheduled) return;
+  const pr=state.pendingRaid;
+  if(!pr) return;
+  const atkIsBot=state.guilds[pr.atkIdx] && state.guilds[pr.atkIdx].isBot;
+  const defIsBot=state.guilds[pr.defIdx] && state.guilds[pr.defIdx].isBot;
+  let side=null;
+  if(atkIsBot && !pr.atkRoll) side='atk';
+  else if(defIsBot && !pr.defRoll) side='def';
+  if(!side) return;
+  botRaidRollScheduled=true;
+  setTimeout(function(){ botRaidRollScheduled=false; withState(function(){ rollRaidSide(side); }); }, BOT_SPEEDS[botSpeedIdx]);
+}
 
+// pausing an online room is a host-only privilege — everyone's actions
+// freeze either way (isFrozen() reads the synced state.paused), but only
+// the host's device can flip it, same as calling End Game
 function setPaused(p){
-  gamePaused=p;
+  if(LOCAL_MODE){
+    gamePaused=p;
+    renderPauseUI();
+    if(state) render();
+    return;
+  }
+  if(myGuildIndex!==0) return;
+  withState(function(){ state.paused=p; });
+}
+function renderPauseUI(){
+  const p=isPaused();
+  const isHost=LOCAL_MODE || myGuildIndex===0;
   document.getElementById('pausedBanner').classList.toggle('show', p);
   document.getElementById('btnPause').textContent = p ? '▶️' : '⏸️';
   document.getElementById('btnPause').title = p ? 'Resume' : 'Pause';
-  if(state) render();
+  document.getElementById('btnResume').style.display = isHost ? '' : 'none';
+  document.getElementById('pausedBannerHint').textContent = isHost
+    ? "No one's turn is moving while this is up."
+    : "The host paused the game — no one's turn is moving while this is up.";
 }
-document.getElementById('btnPause').onclick=function(){ setPaused(!gamePaused); };
+document.getElementById('btnPause').onclick=function(){ setPaused(!isPaused()); };
 document.getElementById('btnResume').onclick=function(){ setPaused(false); };
 
 document.getElementById('logToggle').onclick=function(){ document.getElementById('logPanel').classList.toggle('collapsed'); };
@@ -386,15 +419,16 @@ function openLocalIdentityStep(){
   showScreen('screenIdentity');
 }
 let pendingJoinSlot=null;
-function openJoinIdentity(slotIdx, defaultName){
+function openJoinIdentity(slotIdx, usedColors){
   pendingFlow='join';
   pendingJoinSlot=slotIdx;
-  colorGrid.style.display='none';
+  colorGrid.style.display='';
   document.getElementById('identityHeading').textContent='Name your guild';
-  document.getElementById('identityDesc').textContent='Pick a name for your guild.';
+  document.getElementById('identityDesc').textContent='Pick a name and a color for your guild.';
   document.getElementById('identityName').value='';
-  document.getElementById('identityName').placeholder=defaultName||'Guild name';
+  document.getElementById('identityName').placeholder='Guild name';
   document.getElementById('identityErr').textContent='';
+  refreshColorGridAvailability(usedColors||[]);
   showScreen('screenIdentity');
 }
 document.getElementById('btnLocalNext').onclick=function(){
@@ -408,13 +442,6 @@ document.getElementById('btnCreateNext').onclick=function(){ openIdentity('onlin
 document.getElementById('btnBackFromIdentity').onclick=function(){
   showScreen(pendingFlow==='local' ? 'screenHome' : (pendingFlow==='join' ? 'screenSlots' : 'screenCreate'));
 };
-
-function colorsForRoom(n, chosenIdx){
-  const pool=COLOR_OPTIONS.map(function(o){return o.color;});
-  const chosen=pool.splice(chosenIdx,1)[0];
-  const ordered=[chosen].concat(pool);
-  return ordered.slice(0,n);
-}
 
 document.getElementById('btnIdentityGo').onclick=async function(){
   const name=document.getElementById('identityName').value.trim();
@@ -466,7 +493,15 @@ document.getElementById('btnIdentityGo').onclick=async function(){
         showScreen('screenSlots');
         return;
       }
+      const takenColors=fs.guilds.filter(function(g){return !!g.claimedBy;}).map(function(g){return g.color;});
+      if(takenColors.indexOf(chosenColor)>=0){
+        errEl.textContent='That color was just taken — pick another.';
+        refreshColorGridAvailability(takenColors);
+        btn.disabled=false; btn.textContent='Next';
+        return;
+      }
       fs.guilds[pendingJoinSlot].name=name.slice(0,18);
+      fs.guilds[pendingJoinSlot].color=chosenColor;
       fs.guilds[pendingJoinSlot].claimedBy=deviceId;
       await set(roomRef(), fs);
       myGuildIndex=pendingJoinSlot;
@@ -489,8 +524,7 @@ document.getElementById('btnIdentityGo').onclick=async function(){
     LOCAL_MODE=false;
     roomCode=genCode();
     const s=freshState(createN);
-    const colors=colorsForRoom(createN, identityColorIdx);
-    s.guilds.forEach(function(g,i){ g.color=colors[i]; });
+    s.guilds.forEach(function(g,i){ g.color = i===0 ? chosenColor : null; });
     s.guilds[0].name=name;
     s.guilds[0].claimedBy=deviceId;
     await set(roomRef(), s);
@@ -542,7 +576,7 @@ function renderLocalSeatRow(){
 renderLocalSeatRow();
 
 function genCode(){ const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<4;i++) s+=chars[Math.floor(Math.random()*chars.length)]; return s; }
-function freshGuild(i){ return { name:'Guild '+String.fromCharCode(65+i), color:PALETTE[i], idx:0, progress:0, ap:2, mat:{}, gear:[], turnsOnFloor:1, eventCurse:false, hexCurse:false, hexCurseHeavy:false, claimedBy:null, isBot:false }; }
+function freshGuild(i){ return { name:'Guild '+String.fromCharCode(65+i), color:PALETTE[i], idx:0, progress:0, ap:2, mat:{}, gear:[], turnsOnFloor:1, eventCurse:false, hexCurse:false, hexCurseHeavy:false, claimedBy:null, isBot:false, inactiveSkips:0 }; }
 function freshState(n){
   const poolCap=poolCapFor(n);
   return {
@@ -590,18 +624,23 @@ function renderSlotPicker(s){
     const b=document.createElement('button');
     b.className='slotBtn';
     const taken = !!g.claimedBy;
-    const colorIdx=COLOR_OPTIONS.findIndex(function(o){ return o.color===g.color; });
-    const colorName = colorIdx>=0 ? COLOR_OPTIONS[colorIdx].name : g.name;
-    const icon = colorIdx>=0
-      ? '<span class="ic art" style="--art:'+art('guild',colorIdx+1)+';color:'+g.color+'"></span>'
-      : '<span class="dotc" style="background:'+g.color+'"></span>';
-    b.innerHTML='<span class="slotIdentity">'+icon+'<span class="slotName" style="color:'+g.color+'">'+colorName+'</span></span><span class="tag'+(g.isBot?' bot':'')+'">'+(g.isBot?'AI':(taken?'taken':'open'))+'</span>';
+    if(g.color){
+      const colorIdx=COLOR_OPTIONS.findIndex(function(o){ return o.color===g.color; });
+      const colorName = colorIdx>=0 ? COLOR_OPTIONS[colorIdx].name : g.name;
+      const icon = colorIdx>=0
+        ? '<span class="ic art" style="--art:'+art('guild',colorIdx+1)+';color:'+g.color+'"></span>'
+        : '<span class="dotc" style="background:'+g.color+'"></span>';
+      b.innerHTML='<span class="slotIdentity">'+icon+'<span class="slotName" style="color:'+g.color+'">'+colorName+'</span></span><span class="tag'+(g.isBot?' bot':'')+'">'+(g.isBot?'AI':(taken?'taken':'open'))+'</span>';
+    } else {
+      b.innerHTML='<span class="slotIdentity"><span class="dotc" style="background:transparent;border:1px dashed var(--text-dim);"></span><span class="slotName">Open seat</span></span><span class="tag">open</span>';
+    }
     if(taken) b.disabled=true;
     b.onclick=async function(){
       const fresh=await get(roomRef());
       const fs=fresh.val();
       if(fs.guilds[i].claimedBy){ renderSlotPicker(fs); return; }
-      openJoinIdentity(i, colorName);
+      const usedColors=fs.guilds.filter(function(gg){return !!gg.claimedBy;}).map(function(gg){return gg.color;});
+      openJoinIdentity(i, usedColors);
     };
     row.appendChild(b);
   });
@@ -637,7 +676,9 @@ function renderLobby(){
   row.innerHTML=state.guilds.map(function(g,i){
     const you = i===myGuildIndex;
     const tag = g.isBot ? 'AI' : (g.claimedBy?'ready':'waiting');
-    return '<div class="slotBtn"><span><span class="dotc" style="background:'+g.color+'"></span>'+g.name+(you?' (you)':'')+'</span><span class="tag'+(g.isBot?' bot':'')+'">'+tag+'</span></div>';
+    const dotStyle = g.color ? 'background:'+g.color+';' : 'background:transparent;border:1px dashed var(--text-dim);';
+    const label = g.color ? g.name : 'Open seat';
+    return '<div class="slotBtn"><span><span class="dotc" style="'+dotStyle+'"></span>'+label+(you?' (you)':'')+'</span><span class="tag'+(g.isBot?' bot':'')+'">'+tag+'</span></div>';
   }).join('');
   const claimedCount=state.guilds.filter(function(g){return !!g.claimedBy;}).length;
   const openSlot=state.guilds.some(function(g){return !g.claimedBy;});
@@ -655,6 +696,9 @@ document.getElementById('btnAddBot').onclick=async function(){
   const s=(await get(roomRef())).val();
   const idx=s.guilds.findIndex(function(g){return !g.claimedBy;});
   if(idx===-1) return;
+  const usedColors=s.guilds.filter(function(g){return !!g.claimedBy;}).map(function(g){return g.color;});
+  const freeColor=COLOR_OPTIONS.find(function(o){return usedColors.indexOf(o.color)<0;});
+  s.guilds[idx].color = freeColor ? freeColor.color : COLOR_OPTIONS[idx%COLOR_OPTIONS.length].color;
   s.guilds[idx].isBot=true;
   s.guilds[idx].claimedBy='bot';
   s.log.unshift({t:s.guilds[idx].name+' is now controlled by AI.', cls:''});
@@ -705,6 +749,7 @@ function restartLocalGame(){
   lastHumanSeatLocal=null;
   seatingRollAckedId=null;
   state.log=[{t:'New expedition, same guilds.', cls:''}];
+  gamePaused=false;
   render();
 }
 document.getElementById('btnLeaveLobby').onclick=function(){ leaveOnline(false); };
@@ -822,6 +867,7 @@ async function withState(fn){
 let lastLogCount=0;
 function render(){
   if(!state) return;
+  renderPauseUI();
   renderSeatingRollOverlay();
   const pool=state.pools[me().idx];
   const f=floors[me().idx];
@@ -963,6 +1009,7 @@ function render(){
   renderDuel();
   if(document.getElementById('blacksmithPanel').classList.contains('show')) renderBlacksmithShop();
   maybeBotSeatingRoll();
+  maybeBotRaidRoll();
   maybeBotContinue();
 }
 
@@ -1223,7 +1270,6 @@ function renderDice(){
 }
 
 let lastDuelKey=null;
-let lastPendingKey=null;
 function renderDuel(){
   const overlay=document.getElementById('duelOverlay');
   if(!overlay) return;
@@ -1231,22 +1277,44 @@ function renderDuel(){
   const pending=state.pendingRaid;
   const d=state.lastDuel;
   if(pending && (!d || d.seq!==pending.seq)){
-    if(pending.seq!==lastPendingKey){
-      lastPendingKey=pending.seq;
-      const atk=state.guilds[pending.atkIdx], def=state.guilds[pending.defIdx];
-      document.getElementById('duelTypeLabel').textContent='RAID';
-      document.getElementById('duelAtkName').textContent=atk.name;
-      document.getElementById('duelDefName').textContent=def.name;
+    const atk=state.guilds[pending.atkIdx], def=state.guilds[pending.defIdx];
+    document.getElementById('duelTypeLabel').textContent='RAID';
+    document.getElementById('duelAtkName').textContent=atk.name;
+    document.getElementById('duelDefName').textContent=def.name;
+    const atkBonus=raidGearBonus(atk), defBonus=raidGearBonus(def);
+    if(pending.atkRoll){
+      const atkScore=pending.atkRoll.d1+pending.atkRoll.d2+atkBonus;
+      document.getElementById('duelAtkDice').innerHTML=diceFace(pending.atkRoll.d1,'','duelA1')+diceFace(pending.atkRoll.d2,'','duelA2');
+      document.getElementById('duelAtkScore').textContent=atkScore+(atkBonus?' ('+(pending.atkRoll.d1+pending.atkRoll.d2)+'+'+atkBonus+')':'');
+    } else {
       document.getElementById('duelAtkDice').innerHTML=diceFace(1,'idle')+diceFace(1,'idle');
-      document.getElementById('duelDefDice').innerHTML=diceFace(1,'idle')+diceFace(1,'idle');
       document.getElementById('duelAtkScore').textContent='';
-      document.getElementById('duelDefScore').textContent='';
-      const resultEl=document.getElementById('duelResultText');
-      resultEl.textContent='Ready to roll.';
-      resultEl.className='duelResultText';
-      overlay.classList.add('show');
     }
-    rollBtn.style.display = isMyTurn() ? '' : 'none';
+    if(pending.defRoll){
+      const defScore=pending.defRoll.d1+pending.defRoll.d2+defBonus;
+      document.getElementById('duelDefDice').innerHTML=diceFace(pending.defRoll.d1,'','duelD1')+diceFace(pending.defRoll.d2,'','duelD2');
+      document.getElementById('duelDefScore').textContent=defScore+(defBonus?' ('+(pending.defRoll.d1+pending.defRoll.d2)+'+'+defBonus+')':'');
+    } else {
+      document.getElementById('duelDefDice').innerHTML=diceFace(1,'idle')+diceFace(1,'idle');
+      document.getElementById('duelDefScore').textContent='';
+    }
+    const resultEl=document.getElementById('duelResultText');
+    const canRollAtk = !pending.atkRoll && (LOCAL_MODE || isMyTurn());
+    const canRollDef = !pending.defRoll && (LOCAL_MODE || myGuildIndex===pending.defIdx);
+    if(canRollAtk){
+      resultEl.textContent = atk.name+', roll your dice!';
+      rollBtn.style.display='';
+      rollBtn.dataset.side='atk';
+    } else if(canRollDef){
+      resultEl.textContent = def.name+', roll to defend!';
+      rollBtn.style.display='';
+      rollBtn.dataset.side='def';
+    } else {
+      resultEl.textContent = !pending.atkRoll ? 'Waiting for '+atk.name+' to roll…' : 'Waiting for '+def.name+' to roll…';
+      rollBtn.style.display='none';
+    }
+    resultEl.className='duelResultText';
+    overlay.classList.add('show');
     return;
   }
   rollBtn.style.display='none';
@@ -1786,7 +1854,7 @@ function trainAction(){
 // commits to a raid (spends the AP, locks in target and wager) but doesn't
 // roll yet — a human player rolls their own dice via the duel overlay's
 // Roll button; a bot's turn rolls immediately since nothing is waiting on it
-function raidAction(targetIdx, wagerMat, autoResolve){
+function raidAction(targetIdx, wagerMat){
   const g=me();
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
   const targets=others();
@@ -1805,16 +1873,26 @@ function raidAction(targetIdx, wagerMat, autoResolve){
     return;
   }
   state.rollSeq=(state.rollSeq||0)+1;
-  state.pendingRaid = { seq: state.rollSeq, atkIdx: state.current, defIdx: defIdx, wagerMat: wagering?wagerMat:null };
-  if(autoResolve) resolveRaidRoll();
+  state.pendingRaid = { seq: state.rollSeq, atkIdx: state.current, defIdx: defIdx, wagerMat: wagering?wagerMat:null, atkRoll:null, defRoll:null };
 }
-function resolveRaidRoll(){
+// Raid is now a face-off both sides actually play: the attacker rolls their
+// own dice, then the defender rolls theirs (on their own device in online
+// play), and only once both are in does the outcome resolve. Bots roll
+// their side automatically via maybeBotRaidRoll, whichever side they're on.
+function rollRaidSide(side){
+  const pr=state.pendingRaid;
+  if(!pr) return;
+  if(side==='atk'){ if(pr.atkRoll) return; pr.atkRoll={ d1:1+Math.floor(Math.random()*6), d2:1+Math.floor(Math.random()*6) }; }
+  else { if(pr.defRoll) return; pr.defRoll={ d1:1+Math.floor(Math.random()*6), d2:1+Math.floor(Math.random()*6) }; }
+  if(pr.atkRoll && pr.defRoll) finalizeRaid();
+}
+function finalizeRaid(){
   const pending=state.pendingRaid;
-  if(!pending) return;
+  if(!pending || !pending.atkRoll || !pending.defRoll) return;
   const g=state.guilds[pending.atkIdx], t=state.guilds[pending.defIdx];
   const wagerMat=pending.wagerMat, wagering=!!wagerMat;
-  const ad1=1+Math.floor(Math.random()*6), ad2=1+Math.floor(Math.random()*6);
-  const dd1=1+Math.floor(Math.random()*6), dd2=1+Math.floor(Math.random()*6);
+  const ad1=pending.atkRoll.d1, ad2=pending.atkRoll.d2;
+  const dd1=pending.defRoll.d1, dd2=pending.defRoll.d2;
   const atkBonus=raidGearBonus(g), defBonus=raidGearBonus(t);
   const atkScore=ad1+ad2+atkBonus, defScore=dd1+dd2+defBonus;
   const win=atkScore>defScore;
@@ -1992,7 +2070,10 @@ function showOnlyPanel(id){
   });
 }
 
-document.getElementById('btnEndTurn').onclick=function(){ if(!isMyTurn()) return; withState(endTurnAction); };
+document.getElementById('btnEndTurn').onclick=function(){
+  if(!isMyTurn()) return;
+  withState(function(){ me().inactiveSkips=0; endTurnAction(); });
+};
 document.getElementById('btnHunt').onclick=function(){
   if(!isMyTurn()) return;
   const useBroken=document.getElementById('brokenGearToggle').checked;
@@ -2015,8 +2096,9 @@ document.getElementById('btnSendRaid').onclick=function(){
   document.getElementById('raidWagerRow').style.display='none';
 };
 document.getElementById('duelRollBtn').onclick=function(){
-  if(!isMyTurn()) return;
-  withState(resolveRaidRoll);
+  const side=this.dataset.side;
+  if(!side) return;
+  withState(function(){ rollRaidSide(side); });
 };
 let transmutePicks={};
 function renderTransmutePicker(){
@@ -2163,7 +2245,15 @@ function maybeSkipInactivePlayer(){
     if(state.winner!==null && state.winner!==undefined) return;
     const cur=me();
     if(cur.isBot || !state.turnStartedAt || Date.now()-state.turnStartedAt<INACTIVITY_MS) return;
-    addLog(cur.name+' was inactive too long, their turn was skipped.', 'st');
+    cur.inactiveSkips=(cur.inactiveSkips||0)+1;
+    if(cur.inactiveSkips>=3){
+      cur.isBot=true;
+      cur.claimedBy='bot';
+      cur.inactiveSkips=0;
+      addLog(cur.name+' was inactive for 3 turns in a row and is now controlled by AI.', 'st');
+    } else {
+      addLog(cur.name+' was inactive too long, their turn was skipped.', 'st');
+    }
     endTurnAction();
   });
 }
@@ -2236,7 +2326,7 @@ function botStep(){
     const pick=pool[Math.floor(Math.random()*pool.length)];
     const spareKeys=stockKeys(g);
     const wagerMat = spareKeys.length>=2 && Math.random()<0.35 ? spareKeys[Math.floor(Math.random()*spareKeys.length)] : null;
-    withState(function(){ raidAction(pick.i, wagerMat, true); });
+    withState(function(){ raidAction(pick.i, wagerMat); });
     return;
   }
   if(Math.random()<0.1 && others().length && stockKeys(g).length){
