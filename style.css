@@ -1,6 +1,5 @@
   :root {
-    /* dungeon stone, not deep space: a near-black basalt base with a purple
-       System-glow shaft, courtesy of Manmeet's palette pass */
+
     --bg-deep: #08060d;
     --bg-glow-1: rgba(124, 58, 237, 0.14);
     --bg-glow-2: rgba(76, 29, 149, 0.20);
@@ -17,8 +16,7 @@
     --text-hi: #eef1ff;
     --text-mid: #a9adc9;
     --text-dim: #6d7093;
-    /* corner-notch tokens, courtesy of Manmeet's pass — used alongside the
-       System-window brackets rather than replacing them everywhere */
+
     --notch: 14px;
     --notch-sm: 8px;
   }
@@ -29,8 +27,7 @@
 
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    /* the softer radiant-glow look from Manmeet's palette pass — kept here for the
-       setup flow; the grittier hatched stone texture below is reserved for in-game */
+
     background:
       radial-gradient(ellipse 70% 45% at 50% 108%, var(--bg-ember), transparent 60%),
       radial-gradient(circle at 50% -12%, var(--bg-glow-2), transparent 55%),
@@ -74,7 +71,7 @@
   h1.title {
     font-family: 'Cinzel', serif;
     font-weight: 700;
-    font-size: clamp(42px, 7vw, 72px);  /* scales up with screen size */
+    font-size: clamp(42px, 7vw, 72px);
     letter-spacing: 2px;
     margin: 0 0 2px;
     text-align: center;
@@ -82,7 +79,6 @@
 
   }
 
-/* --- hero title upgrade: bigger, centered, glowing/flickering backdrop --- */
 .heroWrap {
   position: relative;
   min-height: 46vh;
@@ -132,8 +128,7 @@
 
 body.in-game .heroWrap { display: none; }
 
-/* TEMP: main page is just the big centered title for now, per teammate request.
-   Remove this block to bring back the subtitle + Local/Online setup panel. */
+/* TEMP: title-only page */
 p.subtitle,
 #screenHome {
   display: none;
@@ -155,7 +150,6 @@ p.subtitle,
     box-shadow: 0 0 24px rgba(139, 92, 246, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.03), inset 0 0 0 1px rgba(139, 92, 246, 0.08);
   }
 
-  /* System-window corner brackets, the anime-HUD framing motif carried onto every panel */
   .glass::before,
   .glass::after {
     content: '';
@@ -182,8 +176,6 @@ p.subtitle,
     border-top: none;
   }
 
-  /* elements that also carry the cut-stone notch clip-path would slice these brackets
-     in half at the same two corners, so they don't get the bracket motif */
   .card.glass::before,
   .card.glass::after,
   .turnBanner.glass::before,
@@ -198,8 +190,7 @@ p.subtitle,
   .panelInline.glass::after,
   .modalCard.glass::before,
   .modalCard.glass::after,
-  /* the outbreak dial and dice cubes sit close enough to the edges that the
-     corner brackets cut across them instead of just framing the panel */
+
   .outbreakBadge.glass::before,
   .outbreakBadge.glass::after,
   #diceReveal.glass::before,
@@ -207,8 +198,6 @@ p.subtitle,
     display: none;
   }
 
-  /* notched corners on the setup-flow cards specifically — brackets carry the HUD,
-     notches carry the "cut stone tablet" cards you fill out before you're in it */
   .card {
     max-width: 480px;
     margin: 0 auto 40px;
@@ -522,7 +511,6 @@ p.subtitle,
     clip-path: polygon(var(--notch) 0, 100% 0, 100% calc(100% - var(--notch)), calc(100% - var(--notch)) 100%, 0 100%, 0 var(--notch));
   }
 
-  /* turn indicator: diamond, not a circle dot — this is the biggest single change vs. the "player card + round dot" pattern */
   .turnBanner .dot {
     width: 10px;
     height: 10px;
@@ -562,7 +550,6 @@ p.subtitle,
     gap: 6px;
   }
 
-  /* this dot ships an inline border-radius:50% from game.js, so it needs !important to win the diamond shape */
   .guildPanel h3 .dot {
     border-radius: 0 !important;
     transform: rotate(45deg);
@@ -711,7 +698,6 @@ p.subtitle,
     perspective-origin: 50% 52%;
   }
 
-  /* the camera pans down as you climb, so cleared floors slide under the action bar and read through it */
   #world::after {
     content: '';
     position: absolute;
@@ -908,10 +894,6 @@ p.subtitle,
     }
   }
 
-  /* a hard-to-miss toast column for Tower Events and Hunt results — the log
-     line alone was easy to scroll past mid-turn. Several can be visible at
-     once: a new one pops in at the top and pushes the rest down instead of
-     replacing whatever was still being read */
   #eventToastStack {
     position: fixed;
     top: 18px;
@@ -998,8 +980,6 @@ p.subtitle,
     letter-spacing: 0.5px;
   }
 
-  /* a real depleting clock-face: --pct (set inline from JS) drains the conic
-     ring as the timer counts down, not just a pulsing static circle */
   .outbreakBadge .obDial {
     position: relative;
     display: flex;
@@ -1043,8 +1023,6 @@ p.subtitle,
     }
   }
 
-  /* a real flash at 2 and 1, not just a gentle pulse — alternates full-bright
-     coral against the dial's own dark backing so it reads unmistakably */
   .outbreakBadge.warn {
     border-color: #ff5a42;
     animation: flashBadge 0.5s step-end infinite;
@@ -1105,8 +1083,6 @@ p.subtitle,
     }
   }
 
-  /* art/ is black line work on transparent, so it needs inverting on this background.
-     put .art on an element, give it --art. still placeholder: .pawn, #world, gear. */
   .art {
     position: relative;
   }
@@ -1135,7 +1111,6 @@ p.subtitle,
     width: 24px;
     height: 24px;
   }
-
 
 .plat {
   position: absolute; left: -330px; bottom: 0; width: 660px; height: 128px;
@@ -1189,8 +1164,7 @@ p.subtitle,
     transform: translate3d(0, calc(var(--i) * -182px), calc(var(--i) * 20px));
     border-radius: 6px;
     padding: 12px 16px;
-    /* worn stone slab, not a glass card: a torch-glow at the left edge where the
-       floor marker sits, faint diagonal cracks, and a matte (not glossy) base */
+
     background:
       radial-gradient(70% 140% at 4% 30%, rgba(255, 170, 90, 0.10), transparent 55%),
       repeating-linear-gradient(35deg, rgba(255, 255, 255, 0.025) 0px, rgba(255, 255, 255, 0.025) 1px, transparent 1px, transparent 22px),
@@ -1224,7 +1198,6 @@ p.subtitle,
     box-shadow: 0 0 90px -14px var(--tint), inset 0 0 0 1px rgba(255, 255, 255, 0.25);
   }
 
-  /* a stone stairway between floors instead of a plain dashed line */
   .plat:not(.top)::after {
     content: '';
     position: absolute;
@@ -1304,7 +1277,6 @@ p.subtitle,
     color: var(--text-mid);
   }
 
-  /* preserve-3d has to survive all the way down or the standing pawns get flattened */
   .track {
     display: flex;
     align-items: stretch;
@@ -1897,8 +1869,6 @@ p.subtitle,
     min-height: 84px;
   }
 
-  /* the same card face used for a freshly-dealt Loot Card, just smaller and
-   permanent — your held materials should read as the cards they came from */
   .matCard {
     position: relative;
     display: flex;
@@ -2266,6 +2236,65 @@ p.subtitle,
     border-color: var(--gold);
   }
 
+  .transmutePicker {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .transRow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-glow);
+    border-radius: 4px;
+  }
+
+  .transName {
+    flex: 1;
+    font-size: 12.5px;
+    color: var(--text-hi);
+  }
+
+  .transHave {
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .stepper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .stepBtn {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    border: 1px solid var(--border-glow);
+    background: var(--panel-2);
+    color: var(--text-hi);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .stepBtn:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+
+  .stepVal {
+    min-width: 14px;
+    text-align: center;
+    font-weight: 700;
+    color: var(--gold);
+    font-size: 13px;
+  }
+
   #lootChoiceBanner.show {
     display: block;
   }
@@ -2493,7 +2522,6 @@ p.subtitle,
     font-weight: 600;
   }
 
-
   .howBtn {
     background: transparent;
     border: 1px solid var(--border-glow);
@@ -2702,7 +2730,6 @@ p.subtitle,
     gap: 6px;
   }
 
-  /* hex sigil instead of a round avatar chip */
   .avatarChip {
     width: 24px;
     height: 24px;
@@ -2718,7 +2745,8 @@ p.subtitle,
   }
 
   .avatarChip.turn {
-    border-color: #fff;
+    border-color: var(--gold);
+    box-shadow: 0 0 8px var(--gold);
   }
 
   .avatarChip.art::before {

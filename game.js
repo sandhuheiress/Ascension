@@ -1,13 +1,6 @@
-// ------------------------------------------------------------------
-// game.js - all the game logic for ascension: hunter's tower
-// firebase stuff up top for online rooms, then game data/config,
-// then screens + ui wiring, then the actual game engine + render loop,
-// then the ai bot brain all the way at the bottom
-// ------------------------------------------------------------------
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getDatabase, ref, onValue, off, set, get } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 
-// firebase project config, this is what lets online rooms sync live between devices
 const firebaseConfig = {
   apiKey: "AIzaSyCETNzuvNn0-f5CsJhR_okTIgyJMC-dEPQ",
   authDomain: "ascension-e83bb.firebaseapp.com",
@@ -21,7 +14,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
-// all 6 tower floors - name, dr (what you need to roll to hunt), progress needed to ascend, toll to leave
 const floors=[
   {name:"Kasaka Fang", dr:6, need:3, toll:1},
   {name:"Golem Crystal", dr:7, need:4, toll:2},
@@ -31,29 +23,17 @@ const floors=[
   {name:"Sovereign's Ash", dr:11, need:7, toll:0}
 ];
 
-// Rules of Play sections 9 and 14: leaving floors 3, 5 and 6 also costs a Floor Key.
-// A Key is crafted and spent in the same instant, so it never occupies a mat slot.
-// The last one reaches back to Floor 1 on purpose: the leader needs a trailing Guild's material.
 const KEYS={
   2: {name:"Vanguard's Sigil", art:1, cost:{'Kasaka Fang':1,'Golem Crystal':1}},
   4: {name:'Kaisel Ward',      art:2, cost:{'Orc Tusk':1,'Oracle Wisp':1}},
   5: {name:"Sovereign's Bane", art:3, cost:{'Kaisel Scale':1,'Kasaka Fang':1}}
 };
-// section 11: 4 material slots and 2 item slots. section 8: 3 materials buy 1 of choice.
-// section 17: 12 rounds, then the highest climber wins.
 const CAP=4, CAMP_LIMIT=4, GEAR_SLOTS=3, TRANSMUTE_COST=3, LOOT_REVEAL_MS=4500;
-// Kasaka Fang alone is asked for by Basic Bow, Shield, and two different Floor Keys
-// (including the one that wins the game), so a flat pool starves fast with more
-// guilds drawing on it. Scale supply with the table instead of fixing it at 2p tuning.
 function poolCapFor(n){ return 5*n; }
-// most Loot Cards are the floor's raw material, a few are Broken Gear (section 5)
 const LOOT_DECK=['mat','mat','mat','mat','mat','mat','mat','mat','mat','mat','broken','broken'];
-// default guild colors, used before someone actually picks their own
 const PALETTE=['#4fd8ff','#a480ff','#e0b756','#ff8b7a'];
-const FLOOR_TINT=['#4fd8ff','#5de0c8','#a480ff','#d97fe0','#e0b756','#ff8b7a'];
+const FLOOR_TINT=['#5ec98a','#8f7fd9','#c08a4a','#cbb8e6','#a83f42','#e6c26a'];
 const FLOOR_RANK=['E','D','C','B','A','S'];
-// floor 1-6 art: mon = Temple Serpant, crystal golem, Minotaur, Bone Oracle, Ash Drake, Tower Guardian.
-// mat = snake's tooth, resonant crystal, cursed bone, ancient wood, dragon scale, astral core.
 function art(kind, n){ return 'url(art/'+kind+'/'+n+'.png)'; }
 const COLOR_OPTIONS=[
   {color:'#4fd8ff', name:'Azure'},
@@ -61,7 +41,6 @@ const COLOR_OPTIONS=[
   {color:'#e0b756', name:'Topaz'},
   {color:'#ff8b7a', name:'Ember'}
 ];
-// every piece of gear you can craft, what it costs and what it actually does
 const GEAR={
   'Basic Bow':      { type:'weapon', line:'bow',   tier:1, cost:{'Kasaka Fang':2}, desc:'Reroll one die once, must accept the new sum.' },
   'Upgraded Bow':   { type:'weapon', line:'bow',   tier:2, cost:{'Golem Crystal':2}, requires:'Basic Bow', desc:'Reroll one die once, add the new value on top of the original total.' },
@@ -71,24 +50,16 @@ const GEAR={
   'Lucky Coin':     { type:'accessory', cost:{'Orc Tusk':2,'Oracle Wisp':1}, desc:'+1 extra loot on a successful hunt.' },
   'Compass':        { type:'accessory', cost:{'Kaisel Scale':1,'Orc Tusk':2}, desc:'+1 extra Ascension Progress on a successful hunt.' },
   'Ironclad Ward':  { type:'accessory', cost:{'Orc Tusk':2,'Kaisel Scale':1}, desc:'Blocks the next Raid against you outright, then breaks.' },
-  // never crafted, only ever a lucky Loot Card draw (section 12)
   'Broken Gear':    { type:'broken', cost:{}, desc:'Single use: +2 to one hunt, then it breaks.' }
 };
-// emoji fallback icon, only used if a gear piece has no real art yet
 const GEAR_ICON={ 'Basic Bow':'\u{1F3F9}', 'Upgraded Bow':'\u{1F3F9}✨', 'Basic Sword':'⚔️', 'Upgraded Sword':'\u{1F5E1}️', 'Shield':'\u{1F6E1}️', 'Lucky Coin':'\u{1F340}', 'Compass':'\u{1F9ED}', 'Ironclad Ward':'\u{1F6E1}️✨', 'Broken Gear':'\u{1FA93}' };
-// art/icons is full-color art (not the black line-work the rest of art/ uses),
-// so it skips the invert filter via the existing .ink modifier. Only 5 of the
-// 9 gear pieces have custom art so far — anything missing here just falls
-// back to its emoji, same as before.
 const GEAR_ART={ 'Basic Bow':'icon_basic_bow', 'Basic Sword':'icon_basic_sword', 'Compass':'icon_compass', 'Lucky Coin':'icon_lucky_coin', 'Shield':'icon_shield' };
 function gearIcon(name){
   const file=GEAR_ART[name];
   if(!file) return '<span class="ic">'+(GEAR_ICON[name]||'&#x1F392;')+'</span>';
   return '<span class="ic art ink" style="--art:'+art('icons',file)+'"></span>';
 }
-// a material is worth its floor, so the tiebreaker can price a mat at the end (section 17)
 const MAT_VALUE={}; floors.forEach(function(f,i){ MAT_VALUE[f.name]=i+1; });
-// random tower events - roughly 1 in 3 turns rolls one of these
 const EVENTS=[
   {label:'Windfall', apply:function(g,pools){const f=floors[g.idx]; if(pools[g.idx]>0&&addMat(g,f.name,1)){pools[g.idx]-=1; return g.name+' finds a Windfall cache: +1 '+f.name+'.';} return g.name+' finds a Windfall cache, but storage is full.';}},
   {label:'Ambush', apply:function(g){g.progress=Math.max(0,g.progress-1); return g.name+' is Ambushed by lesser beasts: -1 progress.';}},
@@ -105,20 +76,17 @@ const EVENTS=[
   {label:'Stormfront', apply:function(g){ g.hexCurse=true; return 'A Stormfront rolls over the Tower: '+g.name+"'s next Hunt total takes -1."; }}
 ];
 
-// hero title flicker/lightning backdrop (index.html)
 (function () {
   const flicker = document.getElementById('heroFlicker');
   if (!flicker) return;
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (reduceMotion) return;
 
-  // low-level ember flicker: irregular opacity jitter, not a smooth pulse
   function ember() {
     flicker.style.opacity = (0.55 + Math.random() * 0.35).toFixed(2);
   }
   setInterval(ember, 120 + Math.random() * 180);
 
-  // occasional lightning strike: a bright flash that decays back to the ember glow
   function strike() {
     flicker.style.transition = 'none';
     flicker.style.opacity = '1';
@@ -133,7 +101,6 @@ const EVENTS=[
   setTimeout(strike, 4000);
 })();
 
-// ---- sound: short synthesised cues, no audio files and no library ----
 let actx=null, muted=localStorage.getItem('ascension_muted')==='1';
 function tone(freq, dur, type, vol, delay){
   if(!actx || muted) return;
@@ -154,16 +121,9 @@ const SFX={
   climb: function(){ [392,523,659,880].forEach(function(f,i){ tone(f,0.22,'triangle',0.13,i*0.08); }); },
   gain: function(){ tone(880,0.07,'sine',0.11); tone(1175,0.10,'sine',0.09,0.06); },
   outbreak: function(){ tone(110,0.5,'sawtooth',0.13); tone(104,0.6,'sawtooth',0.11,0.12); },
-  // a neutral confirm blip for actions that don't already have their own
-  // distinct sound (Train, Craft, Transmute, Sabotage, Scavenge, Trade) —
-  // every button press should give some audible feedback, not just Hunt
   click: function(){ tone(440,0.05,'sine',0.09); tone(660,0.06,'sine',0.07,0.045); },
-  // a soft ping for the activity toast queue — plays whenever a queued
-  // Tower Event or Hunt result actually appears, not when it happened, so
-  // the sound lines up with what the player is looking at right now
   notify: function(){ tone(660,0.06,'sine',0.08); tone(990,0.09,'sine',0.06,0.05); }
 };
-// browsers refuse to play audio until the user has interacted with the page
 document.addEventListener('pointerdown', function(){
   if(!actx) actx=new (window.AudioContext||window.webkitAudioContext)();
   if(actx.state==='suspended') actx.resume();
@@ -175,9 +135,6 @@ document.getElementById('btnSound').onclick=function(){
 };
 document.getElementById('btnSound').textContent = muted ? '\u{1F507}' : '\u{1F50A}';
 
-// AI turns default to a readable pace, but that can feel painfully slow to a
-// spectator or too fast to actually follow — this cycles through a few fixed
-// delays between bot actions instead of picking one speed for everyone
 const BOT_SPEEDS=[1400,700,350,150];
 const BOT_SPEED_LABELS=['0.5x','1x','2x','4x'];
 let botSpeedIdx=parseInt(localStorage.getItem('ascension_bot_speed')||'1',10);
@@ -189,20 +146,15 @@ document.getElementById('btnSpeed').onclick=function(){
   this.textContent=BOT_SPEED_LABELS[botSpeedIdx];
 };
 
-// random id saved on this device/browser so it knows which seat is "yours" in an online room
 let deviceId = localStorage.getItem('ascension_device_id');
 if(!deviceId){ deviceId='d'+Math.random().toString(36).slice(2,10); localStorage.setItem('ascension_device_id', deviceId); }
 
-// `state` is the entire live game - basically everything reads from it and writes back to it
 let roomCode=null, myGuildIndex=null, state=null, LOCAL_MODE=false, lastHumanSeatLocal=null;
 let botStepScheduled=false;
 function roomRef(){ return ref(db, 'rooms/'+roomCode); }
 
-// just the setup screens, this is what swaps which one is visible
 function screens(){ return ['screenHome','screenCreate','screenIdentity','screenJoin','screenSlots','screenLobby']; }
 function showScreen(id){ screens().forEach(function(s){ document.getElementById(s).style.display = (s===id)?(s==='screenHome'?'block':'block'):'none'; }); document.getElementById('game').style.display='none'; document.body.classList.remove('in-game'); }
-// informational only, no consequence: just shows how long the current turn has run
-// purely a visible timer for the current turn, doesn't affect the game at all
 let turnStartedAt=null, lastTurnKey=null;
 function updateTurnTimerDisplay(){
   const el=document.getElementById('turnTimer');
@@ -212,11 +164,8 @@ function updateTurnTimerDisplay(){
 }
 setInterval(updateTurnTimerDisplay, 1000);
 
-// tutorial / coach tip state - tracks whether tutorial mode is on and which tips already fired
 let tutorialOn=false, tutorialPrompted=false, tutorialChoiceMade=false, gamePaused=false;
 const seenTips=new Set();
-// nothing (bot turns, your own actions) moves while a choice is pending or the
-// game is explicitly paused, so answering the tutorial prompt is never a race
 function isFrozen(){
   return gamePaused || !tutorialChoiceMade || document.getElementById('seatingRollOverlay').classList.contains('show');
 }
@@ -224,8 +173,6 @@ function showGame(){
   screens().forEach(function(s){ document.getElementById(s).style.display='none'; });
   document.getElementById('game').style.display='flex';
   document.body.classList.add('in-game');
-  // pausing your own device is fine solo, but it would freeze the game for
-  // everyone else in an online room, so it's only offered against AI
   document.getElementById('btnPause').style.display = LOCAL_MODE ? '' : 'none';
   document.getElementById('btnSpeed').style.display = LOCAL_MODE ? '' : 'none';
   if(!tutorialPrompted){
@@ -242,11 +189,6 @@ function resolveTutorialChoice(wantsTutorial){
 document.getElementById('btnTutorialYes').onclick=function(){ resolveTutorialChoice(true); };
 document.getElementById('btnTutorialNo').onclick=function(){ resolveTutorialChoice(false); };
 
-// who goes first is now a real choice the table makes together: the overlay
-// waits at a "Roll" button rather than the roll happening invisibly and just
-// being revealed. Gated by the roll's own id so a synced online client only
-// plays the animation once per actual roll, and by tutorialChoiceMade so it
-// never stacks on top of the first-ever-game tutorial prompt
 let seatingRollAckedId=null;
 function performSeatingRoll(){ rollForFirstPlayer(state); }
 let seatingRollSoundedId=null;
@@ -293,7 +235,6 @@ function renderSeatingRollOverlay(){
   };
 }
 
-// pause/resume, only really makes sense in a local game against ai
 function setPaused(p){
   gamePaused=p;
   document.getElementById('pausedBanner').classList.toggle('show', p);
@@ -306,11 +247,6 @@ document.getElementById('btnResume').onclick=function(){ setPaused(false); };
 
 document.getElementById('logToggle').onclick=function(){ document.getElementById('logPanel').classList.toggle('collapsed'); };
 
-// contextual coach marks: a small callout anchored to whatever the player is
-// about to try, shown once ever per id, only if the tutorial was opted into.
-// Deliberately not a forced sequence, just tips as things become relevant.
-// tips queue instead of stacking, so a burst of newly-relevant mechanics
-// (e.g. several buttons unlocking on the same render) don't pile on screen
 let activeTip=false;
 const tipQueue=[];
 function coachTip(id, targetEl, html){
@@ -322,7 +258,7 @@ function coachTip(id, targetEl, html){
 function showNextTip(){
   const next=tipQueue.shift();
   if(!next){ activeTip=false; return; }
-  if(!next.targetEl.offsetParent){ showNextTip(); return; } // target hidden now, skip it
+  if(!next.targetEl.offsetParent){ showNextTip(); return; }
   activeTip=true;
   const tip=document.createElement('div');
   tip.className='coachTip glass';
@@ -339,7 +275,6 @@ function showNextTip(){
   setTimeout(closeFn, 11000);
 }
 
-// ---- home mode toggle ----
 document.getElementById('modeLocalBtn').onclick=function(){
   document.getElementById('modeLocalBtn').classList.add('sel');
   document.getElementById('modeOnlineBtn').classList.remove('sel');
@@ -353,7 +288,6 @@ document.getElementById('modeOnlineBtn').onclick=function(){
   document.getElementById('homeLocalPanel').style.display='none';
 };
 
-// the how to play popup, same one whether it's opened from home or mid-game
 function openHowTo(){ document.getElementById('howToOverlay').classList.add('show'); }
 function closeHowTo(){ document.getElementById('howToOverlay').classList.remove('show'); }
 document.getElementById('btnHowToHome').onclick=openHowTo;
@@ -367,8 +301,7 @@ document.getElementById('btnGoJoin').onclick=function(){ showScreen('screenJoin'
 document.getElementById('btnBackFromJoin').onclick=function(){ showScreen('screenHome'); };
 document.getElementById('btnBackFromSlots').onclick=function(){ showScreen('screenJoin'); };
 
-// ---- identity (name + color) step, shared by local and online-create flows ----
-let pendingFlow=null; // 'local' or 'online'
+let pendingFlow=null;
 let identityColorIdx=0;
 const colorGrid=document.getElementById('colorGrid');
 COLOR_OPTIONS.forEach(function(opt,i){
@@ -393,11 +326,8 @@ function openIdentity(flow){
   Array.from(colorGrid.children).forEach(function(c,i){c.classList.toggle('sel', i===0);});
   showScreen('screenIdentity');
 }
-// local pass-and-play walks the same identity screen once per human seat: seat 0
-// (this device's owner) first, then any seat marked "Friend" in turn, so every
-// human at the table gets to pick their own name and color before play starts
-let localSetupQueue=[]; // remaining seat indices still needing a name+color
-let localSetupResults=[]; // {seat, name, color} collected so far
+let localSetupQueue=[];
+let localSetupResults=[];
 function openLocalIdentityStep(){
   const seat=localSetupQueue[0];
   document.getElementById('identityHeading').textContent = seat===0 ? 'Name your guild' : 'Pass the device — Seat '+String.fromCharCode(65+seat);
@@ -498,7 +428,7 @@ const countRow=document.getElementById('countRow');
 });
 
 let localN=2;
-let localSeatFriend=[false,false,false]; // index 1..3, seat 0 is always you
+let localSeatFriend=[false,false,false];
 const localCountRow=document.getElementById('localCountRow');
 const localSeatRow=document.getElementById('localSeatRow');
 function renderLocalSeatRow(){
@@ -521,11 +451,8 @@ function renderLocalSeatRow(){
 });
 renderLocalSeatRow();
 
-// random 4 letter room code for online games
 function genCode(){ const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s=''; for(let i=0;i<4;i++) s+=chars[Math.floor(Math.random()*chars.length)]; return s; }
-// starting stats for a brand new guild
 function freshGuild(i){ return { name:'Guild '+String.fromCharCode(65+i), color:PALETTE[i], idx:0, progress:0, ap:2, mat:{}, gear:[], turnsOnFloor:1, eventCurse:false, hexCurse:false, hexCurseHeavy:false, claimedBy:null, isBot:false }; }
-// builds the whole starting game state for however many players are in this game
 function freshState(n){
   const poolCap=poolCapFor(n);
   return {
@@ -548,7 +475,6 @@ function freshState(n){
   };
 }
 
-// joining an existing online room by its code
 document.getElementById('btnFindRoom').onclick=async function(){
   const code=document.getElementById('joinCodeInput').value.trim().toUpperCase();
   const errEl=document.getElementById('joinErr');
@@ -567,7 +493,6 @@ document.getElementById('btnFindRoom').onclick=async function(){
   }
 };
 
-// pick which open guild slot you want to claim in the room
 function renderSlotPicker(s){
   const row=document.getElementById('slotRow');
   row.innerHTML='';
@@ -595,8 +520,6 @@ function renderSlotPicker(s){
   });
 }
 
-// the firebase listener - this is what actually makes online play feel live,
-// every connected device gets the new state the moment anything changes
 function attachListener(){
   onValue(roomRef(), function(snap){
     state=snap.val();
@@ -606,7 +529,6 @@ function attachListener(){
   });
 }
 
-// the waiting room screen before the game actually starts
 function renderLobby(){
   document.getElementById('lobbyCode').textContent=roomCode;
   const row=document.getElementById('lobbySlots');
@@ -638,7 +560,6 @@ document.getElementById('btnAddBot').onclick=async function(){
   renderLobby();
 };
 
-// ---- leave / back ----
 function clearLocalStorageRoom(){
   if(roomCode){ localStorage.removeItem('ascension_slot_'+roomCode); }
   localStorage.removeItem('ascension_room');
@@ -653,8 +574,6 @@ function leaveGame(){
   if(LOCAL_MODE){ LOCAL_MODE=false; state=null; showScreen('screenHome'); }
   else { leaveOnline(); }
 }
-// same guilds (names, colors, human/AI seats), a fresh climb — lets a local
-// table play another round without walking back through setup each time
 function restartLocalGame(){
   if(!LOCAL_MODE || !state) return;
   const seats=state.guilds.map(function(g){ return {name:g.name, color:g.color, isBot:g.isBot, claimedBy:g.claimedBy}; });
@@ -678,7 +597,6 @@ document.getElementById('btnEndGame').onclick=function(){
   if(confirm("Call the game now? Standings are ranked by floor reached, then progress, then materials/gear on hand — this ends it for everyone.")) withState(concludeGame);
 };
 
-// ---- auto-rejoin ----
 (function tryAutoRejoin(){
   const savedRoom=localStorage.getItem('ascension_room');
   const savedSlot=localStorage.getItem('ascension_slot_'+savedRoom);
@@ -693,21 +611,14 @@ document.getElementById('btnEndGame').onclick=function(){
   } else { showScreen('screenHome'); }
 })();
 
-// ---- game helpers ----
 function me(){ return state.guilds[state.current]; }
 function isMyTurn(){
   if(LOCAL_MODE) return !state.guilds[state.current].isBot;
   return myGuildIndex===state.current;
 }
-// which seat "this device" is currently acting as: in an online room that's your
-// fixed claimed slot; in a local pass-and-play game it's whichever human seat is
-// active, and it holds onto the last human seat through any bot turns in between
-// so a hotseat player's placemat doesn't blank out and flash back on
 function myActiveIdx(){
   if(!LOCAL_MODE) return myGuildIndex;
   if(!state.guilds[state.current].isBot) lastHumanSeatLocal=state.current;
-  // nobody human has taken a turn yet this game (a bot won the seating roll) —
-  // fall back to the first human seat so the placemat is visible from turn 1
   if(lastHumanSeatLocal===null || lastHumanSeatLocal===undefined || !state.guilds[lastHumanSeatLocal] || state.guilds[lastHumanSeatLocal].isBot){
     const firstHuman=state.guilds.findIndex(function(g){ return !g.isBot; });
     if(firstHuman>=0) lastHumanSeatLocal=firstHuman;
@@ -717,6 +628,7 @@ function myActiveIdx(){
 function others(){ return state.guilds.map(function(g,i){return {g:g,i:i};}).filter(function(o){ return o.i!==state.current; }); }
 function trailing(){ const min=Math.min.apply(null, state.guilds.map(function(g){return g.idx;})); return me().idx===min && state.guilds.some(function(g){return g.idx>min;}); }
 function addLog(t, cls){ state.log = state.log||[]; state.log.unshift({t:t, cls:cls||''}); if(state.log.length>50) state.log=state.log.slice(0,50); }
+function capProgress(g){ const need=floors[g.idx].need; if(g.progress>need) g.progress=need; }
 function canAdd(g,name){ const mat=g.mat||{}; return mat.hasOwnProperty(name) || Object.keys(mat).length<CAP; }
 function addMat(g,name,qty){ if(!canAdd(g,name)) return false; g.mat=g.mat||{}; g.mat[name]=(g.mat[name]||0)+qty; return true; }
 function stockKeys(g){ const mat=g.mat||{}; return Object.keys(mat).filter(function(k){return mat[k]>0;}); }
@@ -725,13 +637,10 @@ function returnMat(name,qty){
   const fi=floors.findIndex(function(fl){ return fl.name===name; });
   if(fi<0) return;
   const cap=state.poolCap||poolCapFor(state.numPlayers||2);
-  state.pools[fi]=Math.max(0,Math.min(cap,state.pools[fi]+qty));   // a negative qty draws from the pool
+  state.pools[fi]=Math.max(0,Math.min(cap,state.pools[fi]+qty));
 }
 function spendMat(g,name,qty){ g.mat[name]-=qty; if(g.mat[name]<=0) delete g.mat[name]; returnMat(name,qty); }
 
-// section 3: each Guild rolls, the highest total goes first. The rolls are
-// also kept as structured data (not just the log line) so every device can
-// play back a proper reveal instead of the game just starting mid-turn
 function rollForFirstPlayer(s){
   let best=-1, first=0;
   const results=s.guilds.map(function(g,i){
@@ -744,12 +653,10 @@ function rollForFirstPlayer(s){
   s.log.unshift({t:'Seating roll: '+results.map(function(r){return r.name+' '+r.roll;}).join(', ')+'. '+s.guilds[first].name+' goes first.', cls:''});
 }
 
-// shared "can this guild pay this material cost" check, used for gear, Floor Keys, and Wards
 function canAfford(g,cost){ return Object.keys(cost).every(function(m){ return (g.mat[m]||0)>=cost[m]; }); }
 function payCost(g,cost){ Object.keys(cost).forEach(function(m){ spendMat(g,m,cost[m]); }); }
 function costText(cost){ return Object.keys(cost).map(function(m){ return cost[m]+' '+m; }).join(' + '); }
 
-// section 9: leaving floors 3, 5 and 6 also costs a Floor Key, crafted and spent on the spot
 function keyFor(idx){ return KEYS[idx]||null; }
 function canPayKey(g,idx){
   const k=keyFor(idx);
@@ -759,7 +666,6 @@ function canAscend(g){
   const f=floors[g.idx];
   return g.ap>0 && g.progress>=f.need && (g.mat[f.name]||0)>=f.toll && canPayKey(g,g.idx);
 }
-// section 17 leaves the tiebreak open, so: a material is worth its floor, gear is worth what it cost
 function guildValue(g){
   let v=0;
   for(const k in (g.mat||{})) v+=(MAT_VALUE[k]||0)*g.mat[k];
@@ -784,8 +690,6 @@ async function withState(fn){
   await pushState();
 }
 
-// the big one. this redraws basically the whole game screen, gets called after
-// pretty much every single action so the ui always matches the current state
 function render(){
   if(!state) return;
   renderSeatingRollOverlay();
@@ -816,7 +720,7 @@ function render(){
 
     const rivalChips = others().map(function(o){
       const g=o.g;
-      const you = g.claimedBy===deviceId; // in LOCAL_MODE a rival, by definition, isn't the seat currently at the device
+      const you = g.claimedBy===deviceId;
       return '<div class="rivalChip" style="border-color:'+g.color+'66;">'+
         '<span class="dot" style="background:'+g.color+';box-shadow:0 0 6px '+g.color+';"></span>'+
         '<span class="rname">'+g.name+'</span>'+
@@ -889,8 +793,6 @@ function render(){
     '<b>Scavenge</b> shows up when you have no material options &mdash; can\'t Train, Blacksmith, Transmute, Ascend, or Trade with what you\'re holding. Spends 1 AP for 1 material from this floor, or the nearest one below. Once per turn.');
   if(!dis.btnAscend) coachTip('ascend', document.getElementById('btnAscend'),
     'You can <b>Ascend</b> now. Progress resets on the next floor, so there\'s no rush to leave the instant you qualify — finish what you\'re doing here first if it helps.');
-  // g0 is whoever's turn it currently is, not necessarily the human's own guild —
-  // these are all about the player's own state, so only check them on canAct
   if(canAct && stockKeys(g0).length>=CAP) coachTip('materialFull', document.getElementById('placematMats'),
     'Storage full: '+CAP+' material <i>kinds</i> is the cap, but stacking more of a kind you already hold is unlimited. Trade, Transmute, or spend some down to make room for a new type.');
   if(canAct && (g0.gear||[]).length>=GEAR_SLOTS) coachTip('gearFull', document.getElementById('placematGear'),
@@ -945,15 +847,8 @@ function renderOutbreakBadge(){
     'When this hits 0, the Monster attacks: whoever\'s furthest ahead loses progress and a material, everyone else loses one or the other. Clearing '+fl.name+' resets it.');
 }
 
-// A single "last event" / "last hunt" slot gets clobbered when things happen
-// back-to-back (bots pace fast, or a human chains two Hunts) — whatever was
-// there gets overwritten before anyone reads it. This queues every distinct
-// Tower Event and Hunt result instead, so each gets its own full turn in the
-// toast, in order, none of them silently skipped.
 const ACTIVITY_TOAST_MS=3800;
 const seenEventIds={}, seenHuntSeqs={};
-// each toast is its own element in the stack, so a new one pops in at the
-// top and pushes the rest down instead of replacing whatever's still up
 function queueActivity(item){
   const stack=document.getElementById('eventToastStack');
   if(!stack) return;
@@ -975,8 +870,6 @@ function checkForNewActivity(){
     seenEventIds[le.id]=true;
     queueActivity({ label:'Tower Event &middot; '+le.guildName, title:le.label, text:le.text });
   }
-  // a plain miss is the most common roll outcome — no toast for those, only
-  // for the outcomes actually worth interrupting to look at
   const h=state.lastHunt;
   if(h && h.seq!==undefined && !seenHuntSeqs[h.seq]){
     seenHuntSeqs[h.seq]=true;
@@ -989,7 +882,6 @@ function checkForNewActivity(){
   }
 }
 
-// just remembers what you were holding last render, so newly gained stuff can animate in
 const prevMats={};
 let prevGear=[];
 
@@ -997,9 +889,6 @@ function renderPlacemat(){
   const wrap=document.getElementById('myPlacemat');
   const activeIdx=myActiveIdx();
   const g=activeIdx!==null && activeIdx!==undefined ? state.guilds[activeIdx] : null;
-  // your own supplies, always visible on your device, not just on your turn —
-  // you need to reference what you're holding while waiting just as much as
-  // when it's actually your move
   const show = !!g && !g.isBot && (state.winner===null || state.winner===undefined);
   wrap.classList.toggle('show', show);
   if(!show) return;
@@ -1012,7 +901,7 @@ function renderPlacemat(){
     const ic=fi>=0
       ? '<span class="ic art" style="--art:'+art('mat',fi+1)+'; --tint:'+tint+'"></span>'
       : '<span class="ic">&#x1F4E6;</span>';
-    const fresh=(g.mat[k]||0)>(prevMats[k]||0);   // a token you just gained drops in
+    const fresh=(g.mat[k]||0)>(prevMats[k]||0);
     return '<div class="matCard'+(fresh?' fresh':'')+'" style="--tint:'+tint+'"><span class="mcQty">x'+g.mat[k]+'</span>'+ic+'<span class="mcName">'+k+'</span></div>';
   });
   Object.keys(prevMats).forEach(function(k){ delete prevMats[k]; });
@@ -1036,7 +925,6 @@ function renderPlacemat(){
   document.getElementById('placematGear').innerHTML = pad(gearChips, GEAR_SLOTS);
 }
 
-// tracks where each guild's pawn was standing so it can animate to the new spot instead of just popping there
 const pawnAt={};
 const PLAT_TILT=50;
 
@@ -1060,7 +948,6 @@ function movePawns(){
   });
 }
 
-// draws the actual 3d tower - every floor, all the pawns, progress tracks, all of it
 function renderTower(){
   const list=document.getElementById('towerList');
   const cam=me().idx;
@@ -1115,7 +1002,6 @@ function renderTower(){
   movePawns();
 }
 
-// dot layout for each dice face, 1 through 6
 const PIP_MAP={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
 function pipCells(n){
   const on=PIP_MAP[n]||[];
@@ -1141,7 +1027,6 @@ function throwDie(el, finalN){
   }, 65);
 }
 
-// renders one loot card, either a material or a broken gear card
 function lootCard(loot){
   if(!loot) return '';
   const face = loot.kind==='mat'
@@ -1151,7 +1036,6 @@ function lootCard(loot){
   return '<div class="lootCard" style="--tint:'+tint+'"><span class="lootTag">Loot</span>'+face+'<span class="lootName">'+loot.name+'</span></div>';
 }
 
-// the dice roll + result display at the bottom of the screen
 function renderDice(){
   const box=document.getElementById('diceReveal');
   const h=state.lastHunt;
@@ -1203,7 +1087,6 @@ function renderDice(){
   }
 }
 
-// keeps the raid/sabotage/transmute target dropdowns pointed at guilds that are still valid targets
 function refreshTargetSelects(){
   const opts = others().map(function(o){ return '<option value="'+o.i+'">'+o.g.name+'</option>'; }).join('');
   ['sabTarget','raidTarget'].forEach(function(id){
@@ -1226,8 +1109,6 @@ document.getElementById('raidWagerToggle').onchange=function(){
   document.getElementById('raidWagerRow').style.display=this.checked?'':'none';
 };
 
-// the Trade panel is a live board: your own want (or the form to post one),
-// then every other guild's open want with a way to pitch against it
 function renderTradeBoard(){
   const board=document.getElementById('tradeBoard');
   if(!board || !state) return;
@@ -1314,8 +1195,6 @@ function renderTradeBoard(){
   });
 }
 
-// picking a card doesn't clear the whole choice — you can keep clicking to
-// claim more than one if you have room, or leave the rest behind on purpose
 function renderGearSwap(){
   const banner=document.getElementById('gearSwapBanner');
   const ps=state.pendingGearSwap;
@@ -1362,7 +1241,6 @@ function renderLootChoice(){
     banner.innerHTML='';
   }
 }
-// actually gives you whichever loot card you just clicked on
 function claimLoot(idx){
   const pl=state.pendingLoot;
   if(!pl) return;
@@ -1383,8 +1261,6 @@ function dismissPendingLoot(){
   state.pendingLoot=null;
 }
 
-// gear slots full when Broken Gear drops: offer a swap instead of just wasting
-// the new item, since bumping an existing piece can be the right call
 function offerGearSwap(g){
   state.pendingGearSwap={ guildIdx: state.guilds.indexOf(g), current: (g.gear||[]).slice() };
   addLog(g.name+"'s gear is full — choose what to drop for the new Broken Gear, or leave it.", 'ev');
@@ -1406,9 +1282,6 @@ function dismissGearSwap(){
   state.pendingGearSwap=null;
 }
 
-// Trade is a want-board, not a one-to-one proposal: post what you need,
-// anyone can pitch what they'd take for it, you pick whichever offer (if
-// any) you like. Only one active want per guild; a new post replaces it.
 function postWant(wantMat, wantQty){
   const g=me();
   state.tradeWants=(state.tradeWants||[]).filter(function(w){ return w.guildIdx!==state.current; });
@@ -1435,8 +1308,6 @@ function withdrawOffer(wantId){
   if(!want) return;
   want.offers=(want.offers||[]).filter(function(o){ return o.fromGuildIdx!==state.current; });
 }
-// the poster rejecting one offer on their own want, without accepting it or
-// cancelling the whole want — the offering guild is free to pitch again
 function declineOffer(wantId, offerId){
   const want=(state.tradeWants||[]).find(function(w){ return w.id===wantId && w.guildIdx===state.current; });
   if(!want) return;
@@ -1465,7 +1336,6 @@ function acceptOffer(wantId, offerId){
   state.tradeWants.splice(wIdx,1);
 }
 
-// punishes sitting on the same floor too long instead of pushing to ascend
 function checkFloorCamping(g){
   if(g.turnsOnFloor>CAMP_LIMIT){
     g.turnsOnFloor=1;
@@ -1479,17 +1349,13 @@ function checkFloorCamping(g){
     addLog(g.name+' camped Floor '+(g.idx+1)+' too long, the Monster attacks (rolled '+roll+'): '+(keys.length?'-1 material.':'nothing to take.'), 'st');
   }
 }
-// rolls to see if a random tower event fires at the start of this turn
 function maybeDrawEvent(g){
   const roll=1+Math.floor(Math.random()*6);
   if(roll>=5){
     const ev=EVENTS[Math.floor(Math.random()*EVENTS.length)];
-    // a broken event must never be able to freeze the whole turn cycle
     try{
       const text=ev.apply(g, state.pools);
       addLog('Tower Event, '+ev.label+': '+text, 'ev');
-      // the log line alone is easy to miss mid-turn, so this also drives a
-      // toast (renderEventToast) that pops over the board for a few seconds
       state.lastEvent={ id:'ev'+Date.now()+Math.floor(Math.random()*10000), guildName:g.name, label:ev.label, text:text };
     }
     catch(e){ console.error('Tower Event "'+ev.label+'" failed:', e); }
@@ -1497,13 +1363,10 @@ function maybeDrawEvent(g){
 }
 function nextIndex(){ return (state.current+1)%state.guilds.length; }
 
-// ---- Monster Outbreak (section 13 of Rules of Play) ----
 function resetOutbreakTimer(){
   state.outbreakFloor = Math.min(state.clearedThrough+1, floors.length-1);
   state.outbreakTimer = floors[state.outbreakFloor].need + 3;
 }
-// softer than a flat hit: the leader gives up ground on two fronts at once,
-// everyone else only loses whichever they can spare least
 function triggerOutbreak(){
   let leadIdx=0;
   state.guilds.forEach(function(g,i){
@@ -1533,9 +1396,6 @@ function triggerOutbreak(){
   resetOutbreakTimer();
 }
 
-// ---- core actions (shared by human buttons and the AI bot) ----
-// there's no fixed round limit — the game can be called at any point, ranked
-// by floor reached, then progress on that floor, then materials/gear value
 function concludeGame(){
   if(state.winner!==null && state.winner!==undefined) return;
   const ranking=state.guilds.map(function(g,i){ return {i:i, idx:g.idx, progress:g.progress, value:guildValue(g)}; })
@@ -1546,12 +1406,9 @@ function concludeGame(){
   addLog('The expedition is called. '+state.guilds[ranking[0].i].name+' holds the strongest position.', 'wn');
 }
 
-// wraps up whoever's turn it currently is and hands it off to the next guild
 function endTurnAction(){
   if(state.winner!==null && state.winner!==undefined) return;
   const n=state.guilds.length;
-  // fixed seating order, no rotation: rotating the round's starting seat was
-  // handing the same guild two turns in a row at every round boundary
   const wrapped = state.current===n-1;
   state.current=(state.current+1)%n;
   if(wrapped) state.round=(state.round||1)+1;
@@ -1560,7 +1417,7 @@ function endTurnAction(){
   state.lastHunt=null;
   const g=me();
   g.ap=2; g.hexCurse=false; g.scavenged=false;
-  g.turnsOnFloor=(g.turnsOnFloor||0)+1;   // nothing was counting this, so the camp penalty never fired
+  g.turnsOnFloor=(g.turnsOnFloor||0)+1;
   checkFloorCamping(g);
   addLog('--- '+g.name+"'s turn begins (round "+state.round+"). ---");
   maybeDrawEvent(g);
@@ -1571,16 +1428,12 @@ function endTurnAction(){
   }
 }
 
-// section 5: a successful hunt draws a Loot Card, usually the floor's material
-// drawing a card from the shared deck and actually claiming it into a guild's
-// storage are separate steps, so a hunt that turns up more than one card can
-// offer them all before anything is committed
 function rollLootCard(){
   if(!state.loot || !state.loot.length){
     state.loot=LOOT_DECK.slice();
     for(let i=state.loot.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=state.loot[i]; state.loot[i]=state.loot[j]; state.loot[j]=t; }
   }
-  return state.loot.pop(); // 'mat' or 'broken'
+  return state.loot.pop();
 }
 function commitLootCard(g, kind, floorIdx){
   g.gear=g.gear||[];
@@ -1595,8 +1448,6 @@ function commitLootCard(g, kind, floorIdx){
   return {kind:'mat', floor:floorIdx, name:f.name, label:'1 '+f.name};
 }
 function drawLoot(g){ return commitLootCard(g, rollLootCard(), g.idx); }
-// a single card just gets kept (as before); a bot auto-claims everything that
-// fits; a human facing 2+ cards gets a picker instead of the game deciding
 function resolveLoot(g, kinds, floorIdx, hunt){
   if(!kinds.length) return;
   if(g.isBot){
@@ -1615,8 +1466,6 @@ function resolveLoot(g, kinds, floorIdx, hunt){
     else addLog(g.name+' finds loot, but has no room for it.');
     return;
   }
-  // more than one card: if there's room to just keep all of them, do that —
-  // only ask the player to pick when gear or material slots actually force a choice
   if(canKeepAllLoot(g, kinds, floorIdx)){
     const committed=[];
     kinds.forEach(function(k){ const c=commitLootCard(g,k,floorIdx); if(c) committed.push(c); });
@@ -1628,10 +1477,6 @@ function resolveLoot(g, kinds, floorIdx, hunt){
   state.pendingLoot={ guildIdx: state.current, options: kinds.map(function(k){ return {kind:k, floorIdx:floorIdx}; }) };
   addLog(g.name+' draws '+kinds.length+' Loot Cards — choose which to keep.', 'ev');
 }
-// would every card in this batch actually fit? all "mat" cards from one hunt
-// are the same material (it stacks into a single slot), so the only real
-// constraints are: room for that one material kind, and enough open gear
-// slots for however many Broken Gear cards are in the batch
 function canKeepAllLoot(g, kinds, floorIdx){
   const hasMat=kinds.some(function(k){ return k!=='broken'; });
   if(hasMat && !canAdd(g, floors[floorIdx].name)) return false;
@@ -1639,12 +1484,6 @@ function canKeepAllLoot(g, kinds, floorIdx){
   return brokenCount<=GEAR_SLOTS-(g.gear||[]).length;
 }
 
-// section 10: the fallback that keeps a stuck Guild from waiting forever
-// "no other option" means no *guaranteed* move is available — Train (if
-// affordable), Blacksmith (if any item is affordable), Ascend, Transmute,
-// and Trade all count. Hunt and Raid don't, since those are a roll, not a
-// sure thing. This only matters while AP remains; at 0 AP there's nothing
-// left to spend on Scavenge, so it's simply unavailable
 function canDoAnything(g){
   if(canAscend(g)) return true;
   if(matTotal(g)>=TRANSMUTE_COST) return true;
@@ -1659,7 +1498,7 @@ function scavengeAction(){
   if(canDoAnything(g)){ addLog(g.name+' still has a legal action, Desperate Scavenge is not available.'); return; }
   let from=g.idx;
   while(from>=0 && state.pools[from]<=0) from-=1;
-  const name = from>=0 ? floors[from].name : floors[g.idx].name;   // otherwise the general supply
+  const name = from>=0 ? floors[from].name : floors[g.idx].name;
   if(!addMat(g,name,1)){ addLog(g.name+' has no free material slot to scavenge into.'); return; }
   if(from>=0) state.pools[from]-=1;
   g.ap-=1;
@@ -1667,9 +1506,6 @@ function scavengeAction(){
   addLog(g.name+' has no other move and Scavenges 1 '+name+', spending its last action point.', 'ev');
   SFX.click();
 }
-// useBrokenGear: omit/true to burn it if equipped (bots always do); pass false
-// to hold onto it — the player decides per-hunt via the checkbox, it's no
-// longer forced onto whatever hunt happens to come next
 function huntAction(useBrokenGear){
   const g=me(), f=floors[g.idx];
   if(state.winner!==null && state.winner!==undefined) return;
@@ -1700,8 +1536,6 @@ function huntAction(useBrokenGear){
   let brokenBonus=0;
   if(hasBroken){
     brokenBonus=2; gearNote+=' (Broken Gear +2, breaks)';
-    // splice out a single copy — you can hold more than one, and filter() would
-    // have burned all of them at once instead of just the one being used
     const brokenIdx=gear.indexOf('Broken Gear');
     if(brokenIdx>=0) gear.splice(brokenIdx,1);
     g.gear=gear;
@@ -1729,8 +1563,6 @@ function huntAction(useBrokenGear){
     addLog(g.name+' rolls double sixes! Critical hunt: +2 progress, action point refunded.'+gearNote+successExtras());
     resolveLoot(g, rolled, g.idx, hunt);
   } else if(d1===1&&d2===1){
-    // a natural 2 plays like the Catan robber: punish whoever is sharing your floor
-    // instead of a blind self-penalty, so it rewards reading the board, not luck
     hunt.snake=true; hunt.shielded=hasShield;
     const here=others().filter(function(o){ return o.g.idx===g.idx && stockKeys(o.g).length; });
     if(here.length){
@@ -1756,23 +1588,15 @@ function huntAction(useBrokenGear){
   }
   g.hexCurse=false;
   g.hexCurseHeavy=false;
+  capProgress(g);
   state.lastHunt=hunt;
 }
-// the safe option - spend 2 of this floor's material for a guaranteed +1 progress, no dice involved
 function trainAction(){
   const g=me(), f=floors[g.idx];
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
-  if((g.mat[f.name]||0)>=2){ spendMat(g,f.name,2); g.progress+=1; g.ap-=1; addLog(g.name+' trains using 2 '+f.name+', guaranteed +1 progress.'); SFX.click(); }
+  if((g.mat[f.name]||0)>=2){ spendMat(g,f.name,2); g.progress+=1; capProgress(g); g.ap-=1; addLog(g.name+' trains using 2 '+f.name+', guaranteed +1 progress.'); SFX.click(); }
   else addLog(g.name+' needs 2 '+f.name+' in storage to train.');
 }
-// Raid is a deliberate strike: you pick a target, and gear (weapons, Lucky
-// Coin, Compass) adds a bonus to an opposed 2d6 roll against the target's
-// own gear-boosted roll. Broken Gear stays Hunt-only — it's governed by the
-// checkbox there, so it doesn't silently burn on a Raid too.
-// wagerMat: optional — going all-in stakes 1 material on the outcome. Win,
-// and the raid's normal effect lands plus the target is knocked down 1
-// progress, with the stake returned untouched. Lose, and the defender
-// keeps the stake as their prize for fighting the raid off.
 function raidAction(targetIdx, wagerMat){
   const g=me();
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
@@ -1813,7 +1637,6 @@ function raidAction(targetIdx, wagerMat){
     ? (g.name+' raids '+t.name+': '+atkScore+' vs '+defScore+', stealing 1 '+s+'.')
     : (g.name+' raids '+t.name+' and wins the roll, '+atkScore+' vs '+defScore+', but they had nothing to take.'))+allInTag, 'st');
 }
-// how much extra a guild's gear adds on top of their raid roll
 function raidGearBonus(g){
   let bonus=0;
   (g.gear||[]).forEach(function(name){
@@ -1830,7 +1653,7 @@ function eligibleGear(g){
   const owned=g.gear||[];
   return Object.keys(GEAR).filter(function(name){
     const def=GEAR[name];
-    if(def.type==='broken') return false;   // Broken Gear only ever comes from a Loot Card
+    if(def.type==='broken') return false;
     if(owned.includes(name)) return false;
     if(def.requires) return owned.includes(def.requires);
     if(def.type==='accessory' && owned.some(function(o){ return GEAR[o]&&GEAR[o].type==='accessory'; })) return false;
@@ -1842,7 +1665,6 @@ function eligibleGear(g){
     return true;
   });
 }
-// actually crafts or upgrades a piece of gear once you can afford it
 function craftAction(itemName){
   const g=me();
   const def=GEAR[itemName];
@@ -1863,27 +1685,31 @@ function craftAction(itemName){
   g.gear.push(itemName);
   addLog(g.name+' crafts a '+itemName+'.');
 }
-// section 8: discard any 3 materials, any mix, to receive 1 material of choice
-function transmuteAction(target){
+function transmuteAction(target, picks){
   const g=me();
   const total=matTotal(g);
   if(total<TRANSMUTE_COST){ addLog(g.name+' needs '+TRANSMUTE_COST+' materials to transmute, has '+total+'.'); return; }
   if(!canAdd(g,target)){ addLog(g.name+' has no free material slot for '+target+'.'); return; }
   const targetFi=floors.findIndex(function(fl){ return fl.name===target; });
   if(targetFi>=0 && state.pools[targetFi]<=0){ addLog('The Tower has no '+target+' left to hand out, its supply is empty.'); return; }
-  let toSpend=TRANSMUTE_COST;
-  // spend the other materials first, so asking for more of what you hold still works
-  const order=stockKeys(g).sort(function(a,b){ return (a===target?1:0)-(b===target?1:0); });
-  for(const k of order){
-    if(toSpend<=0) break;
-    const take=Math.min(g.mat[k],toSpend);
-    toSpend-=take;
-    spendMat(g,k,take);
+  if(picks){
+    const pickTotal=Object.keys(picks).reduce(function(sum,k){ return sum+picks[k]; },0);
+    if(pickTotal!==TRANSMUTE_COST){ addLog('Pick exactly '+TRANSMUTE_COST+' materials to transmute.'); return; }
+    for(const k in picks){ if((g.mat[k]||0)<picks[k]){ addLog(g.name+' does not have enough '+k+'.'); return; } }
+    for(const k in picks){ if(picks[k]>0) spendMat(g,k,picks[k]); }
+  } else {
+    let toSpend=TRANSMUTE_COST;
+    const order=stockKeys(g).sort(function(a,b){ return (a===target?1:0)-(b===target?1:0); });
+    for(const k of order){
+      if(toSpend<=0) break;
+      const take=Math.min(g.mat[k],toSpend);
+      toSpend-=take;
+      spendMat(g,k,take);
+    }
   }
-  addMat(g,target,1); returnMat(target,-1);   // the Tower hands one back out of its own supply
+  addMat(g,target,1); returnMat(target,-1);
   addLog(g.name+' transmutes '+TRANSMUTE_COST+' materials into 1 '+target+'.');
 }
-// moves a guild up to the next floor once they've actually earned it
 function ascendAction(){
   const g=me(), f=floors[g.idx];
   if(canAscend(g)){
@@ -1909,8 +1735,6 @@ function keyCostText(idx){
   return key ? costText(key.cost) : '';
 }
 
-// every inline action panel, so opening one always closes the rest (they used to
-// each hide a different hand-written list, which let two panels show at once)
 const PANEL_IDS=['tradePanel','sabotagePanel','transmutePanel','blacksmithPanel','raidPanel'];
 function showOnlyPanel(id){
   PANEL_IDS.forEach(function(p){
@@ -1921,7 +1745,6 @@ function showOnlyPanel(id){
   });
 }
 
-// ---- button wiring (human only, gated by isMyTurn) ----
 document.getElementById('btnEndTurn').onclick=function(){ if(!isMyTurn()) return; withState(endTurnAction); };
 document.getElementById('btnHunt').onclick=function(){
   if(!isMyTurn()) return;
@@ -1944,18 +1767,60 @@ document.getElementById('btnSendRaid').onclick=function(){
   document.getElementById('raidWagerToggle').checked=false;
   document.getElementById('raidWagerRow').style.display='none';
 };
+let transmutePicks={};
+function renderTransmutePicker(){
+  const g=me();
+  const box=document.getElementById('transmutePicker');
+  const keys=stockKeys(g);
+  for(const k in transmutePicks){ if(keys.indexOf(k)<0) delete transmutePicks[k]; }
+  const total=Object.keys(transmutePicks).reduce(function(sum,k){ return sum+transmutePicks[k]; },0);
+  box.innerHTML=keys.map(function(k){
+    const have=g.mat[k]||0;
+    const picked=transmutePicks[k]||0;
+    return '<div class="transRow">'+
+      '<span class="transName">'+k+'</span>'+
+      '<span class="transHave">have '+have+'</span>'+
+      '<div class="stepper">'+
+        '<button type="button" class="stepBtn" data-mat="'+k+'" data-d="-1">-</button>'+
+        '<span class="stepVal">'+picked+'</span>'+
+        '<button type="button" class="stepBtn" data-mat="'+k+'" data-d="1">+</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  document.getElementById('transmutePickTotal').textContent=total+'/'+TRANSMUTE_COST;
+  document.getElementById('btnDoTransmute').disabled=total!==TRANSMUTE_COST;
+  box.querySelectorAll('.stepBtn').forEach(function(btn){
+    btn.onclick=function(){
+      const mat=btn.dataset.mat, d=parseInt(btn.dataset.d,10);
+      const g2=me();
+      const have=g2.mat[mat]||0;
+      const picked=transmutePicks[mat]||0;
+      const total2=Object.keys(transmutePicks).reduce(function(sum,k){ return sum+transmutePicks[k]; },0);
+      let next=picked+d;
+      if(next<0) next=0;
+      if(next>have) next=have;
+      if(d>0 && total2>=TRANSMUTE_COST) next=picked;
+      if(next<=0) delete transmutePicks[mat]; else transmutePicks[mat]=next;
+      renderTransmutePicker();
+    };
+  });
+}
 document.getElementById('btnTransmute').onclick=function(){
   showOnlyPanel('transmutePanel');
   refreshTargetSelects();
-  coachTip('transmute', document.getElementById('transmuteTarget'),
-    'Discard any '+TRANSMUTE_COST+' materials, in any mix, for 1 of your choice. Free and repeatable — the reliable way to turn junk you\'re holding into what you actually need.');
+  transmutePicks={};
+  renderTransmutePicker();
+  coachTip('transmute', document.getElementById('transmutePicker'),
+    'Pick exactly '+TRANSMUTE_COST+' materials, in any mix, to discard for 1 of your choice. Free and repeatable — the reliable way to turn junk you\'re holding into what you actually need, without touching what you're saving.');
 };
 document.getElementById('btnCancelTransmute').onclick=function(){ document.getElementById('transmutePanel').classList.remove('show'); };
 document.getElementById('btnDoTransmute').onclick=function(){
   if(!isMyTurn()) return;
   const target=document.getElementById('transmuteTarget').value;
-  withState(function(){ transmuteAction(target); });
+  const picks=Object.assign({}, transmutePicks);
+  withState(function(){ transmuteAction(target, picks); });
   document.getElementById('transmutePanel').classList.remove('show');
+  transmutePicks={};
 };
 document.getElementById('btnScavenge').onclick=function(){ if(!isMyTurn()) return; withState(scavengeAction); };
 document.getElementById('btnAscend').onclick=function(){ if(!isMyTurn()) return; withState(ascendAction); };
@@ -2007,8 +1872,6 @@ document.getElementById('btnBlacksmithToggle').onclick=function(){
 };
 document.getElementById('btnCancelBlacksmith').onclick=function(){ document.getElementById('blacksmithPanel').classList.remove('show'); };
 
-// same eligibility rules as eligibleGear(), but explains *why* a locked item is locked
-// instead of just hiding it, so the shop reads like a shop, not a shrinking dropdown
 function gearBlockReason(g,name){
   const def=GEAR[name];
   const owned=g.gear||[];
@@ -2053,16 +1916,11 @@ function renderBlacksmithShop(){
   });
 }
 
-// ---- AI bot driver ----
-// In an online room, only the host device (myGuildIndex===0) drives bot turns, so two devices never race to act for the same bot.
 function isBotDriver(){ return LOCAL_MODE || myGuildIndex===0; }
 
-// online only: if a human sits idle too long (most likely a dropped connection,
-// not just slow thinking) the host device skips their turn so the room isn't
-// stuck waiting on someone who may never come back
 const INACTIVITY_MS = 2*60*1000;
 function maybeSkipInactivePlayer(){
-  if(LOCAL_MODE || myGuildIndex!==0) return; // only the online host enforces this
+  if(LOCAL_MODE || myGuildIndex!==0) return;
   if(!state || (state.winner!==null && state.winner!==undefined)) return;
   const g=me();
   if(!g || g.isBot) return;
@@ -2088,8 +1946,6 @@ function maybeBotContinue(){
   setTimeout(function(){ botStepScheduled=false; botStep(); }, BOT_SPEEDS[botSpeedIdx]);
 }
 
-// this is basically the whole ai brain - one function that decides everything
-// a bot does on its turn, checked one option at a time top to bottom
 function botStep(){
   if(!state) return;
   if(state.winner!==null && state.winner!==undefined) return;
@@ -2097,10 +1953,6 @@ function botStep(){
   if(!g.isBot) return;
   const f=floors[g.idx];
   if(canAscend(g)){ withState(ascendAction); return; }
-  // Trade is free, so bots work the want-board opportunistically rather than
-  // competing with their AP economy: accept a good offer on their own want,
-  // post a want when they're short something, or pitch spare stock at
-  // someone else's want. One action per tick, same as everything else here.
   const myWant=(state.tradeWants||[]).find(function(w){ return w.guildIdx===state.current; });
   if(myWant && (myWant.offers||[]).length && Math.random()<0.6){
     const pick=myWant.offers[Math.floor(Math.random()*myWant.offers.length)];
@@ -2129,13 +1981,11 @@ function botStep(){
     return;
   }
   if(g.ap>0 && !canDoAnything(g) && !g.scavenged){ withState(scavengeAction); return; }
-  // ready to climb but short a toll or Key material: buy it at the camp
   if(g.progress>=f.need && matTotal(g)>=TRANSMUTE_COST){
     const want=[];
     if((g.mat[f.name]||0)<f.toll) want.push(f.name);
     const key=keyFor(g.idx);
     if(key) for(const m in key.cost){ if((g.mat[m]||0)<key.cost[m]) want.push(m); }
-    // don't chase a material the Tower has none left of, or the bot loops forever
     const gettable=want.filter(function(m){ const fi=floors.findIndex(function(fl){return fl.name===m;}); return fi<0 || state.pools[fi]>0; });
     if(gettable.length && canAdd(g,gettable[0])){ withState(function(){ transmuteAction(gettable[0]); }); return; }
   }
@@ -2147,11 +1997,9 @@ function botStep(){
   }
   if((g.mat[f.name]||0)>=2 && Math.random()<0.5){ withState(trainAction); return; }
   if(Math.random()<0.15 && others().length){
-    // prefer a target with something actually worth taking (material)
     const viable=others().filter(function(o){ return stockKeys(o.g).length; });
     const pool=viable.length?viable:others();
     const pick=pool[Math.floor(Math.random()*pool.length)];
-    // going all-in risks a real loss, so only do it with stock to spare
     const spareKeys=stockKeys(g);
     const wagerMat = spareKeys.length>=2 && Math.random()<0.35 ? spareKeys[Math.floor(Math.random()*spareKeys.length)] : null;
     withState(function(){ raidAction(pick.i, wagerMat); });

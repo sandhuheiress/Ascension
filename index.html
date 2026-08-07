@@ -16,7 +16,7 @@
   <p class="subtitle">Play locally vs AI or pass-and-play with friends, or go live online</p>
 </div>
 
-<!-- hiding svg art for now, not needed at the moment
+<!--
 
 <svg id="heroArt" viewBox="0 0 800 320" preserveAspectRatio="xMidYMax slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
@@ -46,7 +46,6 @@
   <rect x="0" y="0" width="800" height="320" fill="url(#heroGlow)"/>
 
 
-  <-- a skyline of lesser spires, so the Tower reads as the tallest among many ->
   <g fill="#1a1428" opacity="0.55">
     <path d="M40,320 L40,250 L62,232 L84,250 L84,320 Z"/>
     <path d="M110,320 L110,275 L126,263 L142,275 L142,320 Z"/>
@@ -56,15 +55,12 @@
 
   <ellipse cx="400" cy="233" rx="90" ry="12" fill="url(#groundGlow)"/>
 
-  <-- lightning arcing off the crown — the Tower is a storm all its own ->
   <g fill="none" stroke="#b09aff" stroke-width="1.3" opacity="0.65" filter="url(#boltGlow)">
     <path d="M397,83 L377,53 L389,51 L364,17 L377,20 L349,-13"/>
     <path d="M403,83 L423,48 L411,46 L439,13 L425,16 L449,-17"/>
     <path d="M400,77 L409,57 L400,55 L412,33"/>
   </g>
 
-  <-- the Tower: a slender crenellated spire, stretched taller, set back with
-       open ground between it and the hunters so it reads as looming in the distance ->
   <path d="M372,232 L372,100 L378,75 L384,98 L392,67 L400,95 L408,73 L416,98 L422,80 L428,100 L428,232 Z"
     fill="url(#towerFace)" stroke="#8b5cf6" stroke-opacity="0.4" stroke-width="1.5"/>
   <g stroke="#8b5cf6" stroke-opacity="0.2" stroke-width="1">
@@ -77,7 +73,6 @@
   <line x1="140" y1="277" x2="660" y2="277" stroke="#7c3aed" stroke-opacity="0.25" stroke-width="1"/>
   <ellipse cx="400" cy="277" rx="130" ry="16" fill="url(#emberGlow)"/>
 
-  <-- hunters holding their guild's banner at the Tower's foot ->
   <g id="heroHunters">
     <g>
       <line x1="331" y1="230" x2="331" y2="192" stroke="#4fd8ff" stroke-width="1.5" opacity="0.9"/>
@@ -186,7 +181,6 @@
 </div>
 
 <div id="game">
-  <!-- the world: a 3D tower you climb. everything else is a HUD layer on top of it -->
   <div id="world"><div id="towerList"></div></div>
 
   <div id="pausedBanner">
@@ -303,10 +297,14 @@
 
       <div class="panelInline glass" id="transmutePanel">
         <div class="row">
-          <div class="field" style="flex:1 1 100%;"><label>Discard 3 materials, receive 1 of</label><select id="transmuteTarget"></select></div>
+          <div class="field" style="flex:1 1 100%;"><label>Pick 3 to discard (<span id="transmutePickTotal">0/3</span>)</label></div>
+        </div>
+        <div id="transmutePicker" class="transmutePicker"></div>
+        <div class="row">
+          <div class="field" style="flex:1 1 100%;"><label>Receive 1 of</label><select id="transmuteTarget"></select></div>
         </div>
         <div class="submitRow">
-          <button class="act" id="btnDoTransmute">Transmute</button>
+          <button class="act" id="btnDoTransmute" disabled>Transmute</button>
           <button class="act" id="btnCancelTransmute">Cancel</button>
         </div>
       </div>
@@ -329,6 +327,26 @@
     <div id="seatingRollList" class="srList"></div>
     <p id="seatingRollWinner" class="srWinner"></p>
     <div class="btnRow" id="seatingRollAction"></div>
+  </div>
+</div>
+
+<div class="modalOverlay duelOverlay" id="duelOverlay">
+  <div class="modalCard glass duelCard" style="width:360px;max-width:calc(100% - 20px);text-align:center;">
+    <div class="duelType" id="duelTypeLabel">RAID</div>
+    <div class="duelSides">
+      <div class="duelSide">
+        <div class="duelName" id="duelAtkName"></div>
+        <div class="diceRow" id="duelAtkDice"></div>
+        <div class="duelScore" id="duelAtkScore"></div>
+      </div>
+      <div class="duelVs">VS</div>
+      <div class="duelSide">
+        <div class="duelName" id="duelDefName"></div>
+        <div class="diceRow" id="duelDefDice"></div>
+        <div class="duelScore" id="duelDefScore"></div>
+      </div>
+    </div>
+    <p class="duelResultText" id="duelResultText"></p>
   </div>
 </div>
 
