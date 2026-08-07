@@ -743,13 +743,18 @@ body.in-game .heroWrap { display: none; }
   }
 
   .hudTop {
-    position: absolute;
+    display: none;
+    position: fixed;
     top: 0;
     left: 0;
     right: 0;
     padding: 12px 16px 0;
-    z-index: 5;
+    z-index: 95;
     pointer-events: none;
+  }
+
+  body.in-game .hudTop {
+    display: block;
   }
 
   .hudTop>* {

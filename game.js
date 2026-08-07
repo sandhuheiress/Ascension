@@ -28,7 +28,7 @@ const KEYS={
   4: {name:'Kaisel Ward',      art:2, cost:{'Orc Tusk':1,'Oracle Wisp':1}},
   5: {name:"Sovereign's Bane", art:3, cost:{'Kaisel Scale':1,'Kasaka Fang':1}}
 };
-const CAP=4, CAMP_LIMIT=4, GEAR_SLOTS=3, TRANSMUTE_COST=3, LOOT_REVEAL_MS=4500, DUEL_REVEAL_MS=4200;
+const CAP=2, CAMP_LIMIT=4, GEAR_SLOTS=3, TRANSMUTE_COST=3, LOOT_REVEAL_MS=6500, DUEL_REVEAL_MS=6000;
 function poolCapFor(n){ return 5*n; }
 const LOOT_DECK=['mat','mat','mat','mat','mat','mat','mat','mat','mat','mat','broken','broken'];
 const PALETTE=['#4fd8ff','#a480ff','#e0b756','#ff8b7a'];
@@ -56,11 +56,11 @@ const GEAR_ICON={ 'Basic Bow':'\u{1F3F9}', 'Upgraded Bow':'\u{1F3F9}✨', 'Basic
 const GEAR_ART={ 'Basic Bow':'icon_basic_bow', 'Upgraded Bow':'icon_bow_upgraded', 'Basic Sword':'icon_basic_sword', 'Upgraded Sword':'icon_sword_upgraded', 'Compass':'icon_compass', 'Lucky Coin':'icon_lucky_coin', 'Shield':'icon_shield' };
 function pseudoHash(str){ let h=0; str=String(str); for(let i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))>>>0; } return h; }
 // Broken Gear has no fixed shape of its own — each piece shows a randomly
-// (but stably, per seed) picked base weapon/accessory icon with the cracked
-// overlay layered on top, so the same piece doesn't change look every render
+// (but stably, per seed) picked base weapon icon with the cracked overlay
+// layered on top, so the same piece doesn't change look every render
+const BROKEN_GEAR_POOL=['Basic Bow','Basic Sword'];
 function brokenGearInner(seed){
-  const pool=Object.keys(GEAR_ART);
-  const base=GEAR_ART[pool[pseudoHash(seed)%pool.length]];
+  const base=GEAR_ART[BROKEN_GEAR_POOL[pseudoHash(seed)%BROKEN_GEAR_POOL.length]];
   return '<span class="brokenBase art ink" style="--art:'+art('icons',base)+'"></span>'+
     '<span class="brokenOverlay" style="--art:'+art('icons','broken_gear_overlay')+'"></span>';
 }
@@ -84,7 +84,7 @@ const EVENTS=[
   {label:'Landslide', apply:function(g){ state.guilds.forEach(function(o){ if(o.ap>0) o.ap-=1; }); return 'A Landslide shakes the whole Tower: every Guild loses 1 action point this turn.'; }},
   {label:'Old rival', apply:function(g){ const rivals=state.guilds.filter(function(o){ return o!==g && stockKeys(o).length; }); if(!rivals.length) return 'An Old Rival passes '+g.name+' by, with nothing worth swapping.'; const r=rivals[Math.floor(Math.random()*rivals.length)]; const myKeys=stockKeys(g); if(!myKeys.length) return g.name+' meets an Old Rival, but has nothing to offer in a swap.'; const mine=myKeys[Math.floor(Math.random()*myKeys.length)]; const theirs=stockKeys(r)[Math.floor(Math.random()*stockKeys(r).length)]; g.mat[mine]-=1; if(g.mat[mine]===0) delete g.mat[mine]; r.mat[theirs]-=1; if(r.mat[theirs]===0) delete r.mat[theirs]; addMat(g,theirs,1); addMat(r,mine,1); return g.name+' and '+r.name+' cross paths: 1 '+mine+' swaps for 1 '+theirs+'.'; }},
   {label:'Merchant caravan', apply:function(g){ g.ap+=1; return 'A Merchant Caravan passes through: '+g.name+' gains +1 action point this turn.'; }},
-  {label:'Stormfront', apply:function(g){ g.hexCurse=true; return 'A Stormfront rolls over the Tower: '+g.name+"'s next Hunt total takes -1."; }}
+  {label:'Stormfront', apply:function(g){ g.hexCurse=true; return 'A Stormfront rolls over the Tower: '+g.name+"'s next Hunt total takes -2."; }}
 ];
 
 (function () {
@@ -270,11 +270,11 @@ function maybeBotSeatingRoll(){
   botSeatRollScheduled=true;
   setTimeout(function(){ botSeatRollScheduled=false; withState(function(){ rollMySeat(idx); }); }, BOT_SPEEDS[botSpeedIdx]);
 }
-let botRaidRollScheduled=false;
-function maybeBotRaidRoll(){
+let botDuelRollScheduled=false;
+function maybeBotDuelRoll(){
   if(!state || !isBotDriver()) return;
-  if(botRaidRollScheduled) return;
-  const pr=state.pendingRaid;
+  if(botDuelRollScheduled) return;
+  const pr=state.pendingDuel;
   if(!pr) return;
   const atkIsBot=state.guilds[pr.atkIdx] && state.guilds[pr.atkIdx].isBot;
   const defIsBot=state.guilds[pr.defIdx] && state.guilds[pr.defIdx].isBot;
@@ -282,8 +282,8 @@ function maybeBotRaidRoll(){
   if(atkIsBot && !pr.atkRoll) side='atk';
   else if(defIsBot && !pr.defRoll) side='def';
   if(!side) return;
-  botRaidRollScheduled=true;
-  setTimeout(function(){ botRaidRollScheduled=false; withState(function(){ rollRaidSide(side); }); }, BOT_SPEEDS[botSpeedIdx]);
+  botDuelRollScheduled=true;
+  setTimeout(function(){ botDuelRollScheduled=false; withState(function(){ rollDuelSide(side); }); }, BOT_SPEEDS[botSpeedIdx]);
 }
 
 // pausing an online room is a host-only privilege — everyone's actions
@@ -315,32 +315,25 @@ document.getElementById('btnResume').onclick=function(){ setPaused(false); };
 
 document.getElementById('logToggle').onclick=function(){ document.getElementById('logPanel').classList.toggle('collapsed'); };
 
-let activeTip=false;
-const tipQueue=[];
+// Tips show immediately (rather than queueing one-at-a-time) so several
+// can be on screen together, each anchored near its own target — they
+// stack instead of forcing the player to dismiss one before seeing the next.
 function coachTip(id, targetEl, html){
-  if(!tutorialOn || seenTips.has(id) || !targetEl) return;
+  if(!tutorialOn || seenTips.has(id) || !targetEl || !targetEl.offsetParent) return;
   seenTips.add(id);
-  tipQueue.push({targetEl:targetEl, html:html});
-  if(!activeTip) showNextTip();
-}
-function showNextTip(){
-  const next=tipQueue.shift();
-  if(!next){ activeTip=false; return; }
-  if(!next.targetEl.offsetParent){ showNextTip(); return; }
-  activeTip=true;
   const tip=document.createElement('div');
   tip.className='coachTip glass';
-  tip.innerHTML='<div class="coachTipBody">'+next.html+'</div><button class="coachTipClose" type="button">Got it</button>';
+  tip.innerHTML='<div class="coachTipBody">'+html+'</div><button class="coachTipClose" type="button">Got it</button>';
   document.body.appendChild(tip);
-  const rect=next.targetEl.getBoundingClientRect();
+  const rect=targetEl.getBoundingClientRect();
   const tw=tip.offsetWidth||260, th=tip.offsetHeight||80;
   let top=rect.bottom+10, left=rect.left+rect.width/2-tw/2;
   if(top+th>window.innerHeight-10){ top=Math.max(10,rect.top-th-10); }
   left=Math.max(10, Math.min(left, window.innerWidth-tw-10));
   tip.style.top=top+'px'; tip.style.left=left+'px';
-  const closeFn=function(){ if(tip.parentNode) tip.remove(); showNextTip(); };
+  const closeFn=function(){ if(tip.parentNode) tip.remove(); };
   tip.querySelector('.coachTipClose').onclick=closeFn;
-  setTimeout(closeFn, 11000);
+  setTimeout(closeFn, 16000);
 }
 
 document.getElementById('modeLocalBtn').onclick=function(){
@@ -616,6 +609,12 @@ document.getElementById('btnFindRoom').onclick=async function(){
     errEl.textContent = 'Could not reach the room: ' + (e && e.message ? e.message : e) + '. Check that Realtime Database is created and its rules allow read/write.';
   }
 };
+document.getElementById('identityName').addEventListener('keydown', function(e){
+  if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btnIdentityGo').click(); }
+});
+document.getElementById('joinCodeInput').addEventListener('keydown', function(e){
+  if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btnFindRoom').click(); }
+});
 
 function renderSlotPicker(s){
   const row=document.getElementById('slotRow');
@@ -762,24 +761,14 @@ document.getElementById('btnEndGame').onclick=function(){
   if(confirm("Call the game now? Standings are ranked by floor reached, then progress, then materials/gear on hand — this ends it for everyone.")) withState(concludeGame);
 };
 
-(function tryAutoRejoin(){
+// A refresh always lands back on the home screen — no auto-rejoin — so
+// stale room/slot info is cleared rather than reattaching to whatever
+// game happened to be open before the reload.
+(function goHomeOnLoad(){
   const savedRoom=localStorage.getItem('ascension_room');
-  const savedSlot=localStorage.getItem('ascension_slot_'+savedRoom);
-  if(savedRoom && savedSlot!==null){
-    get(ref(db,'rooms/'+savedRoom)).then(function(snap){
-      const val=snap.exists() ? snap.val() : null;
-      const concluded = val && val.winner!==null && val.winner!==undefined;
-      if(val && !concluded){
-        LOCAL_MODE=false;
-        roomCode=savedRoom; myGuildIndex=parseInt(savedSlot,10);
-        attachListener();
-      } else {
-        localStorage.removeItem('ascension_slot_'+savedRoom);
-        localStorage.removeItem('ascension_room');
-        showScreen('screenHome');
-      }
-    }).catch(function(){ showScreen('screenHome'); });
-  } else { showScreen('screenHome'); }
+  if(savedRoom) localStorage.removeItem('ascension_slot_'+savedRoom);
+  localStorage.removeItem('ascension_room');
+  showScreen('screenHome');
 })();
 
 function me(){ return state.guilds[state.current]; }
@@ -1009,7 +998,7 @@ function render(){
   renderDuel();
   if(document.getElementById('blacksmithPanel').classList.contains('show')) renderBlacksmithShop();
   maybeBotSeatingRoll();
-  maybeBotRaidRoll();
+  maybeBotDuelRoll();
   maybeBotContinue();
 }
 
@@ -1029,7 +1018,7 @@ function renderOutbreakBadge(){
     'When this hits 0, the Monster attacks: whoever\'s furthest ahead loses progress and a material, everyone else loses one or the other. Clearing '+fl.name+' resets it.');
 }
 
-const ACTIVITY_TOAST_MS=3800;
+const ACTIVITY_TOAST_MS=6000;
 const seenEventIds={}, seenHuntSeqs={};
 function queueActivity(item){
   const stack=document.getElementById('eventToastStack');
@@ -1249,7 +1238,7 @@ function renderDice(){
     '<div class="diceRow">'+diceFace(h.d1,'','dc1')+'<span class="plus">+</span>'+diceFace(h.d2,'','dc2')+'</div>'+
     (h.snake ? '<p style="font-size:12px;color:var(--text-dim);">snake eyes</p>' : '<p style="font-size:12px;color:var(--text-dim);">total '+h.total+' vs DR '+h.dr+'</p>')+
     '<p class="resultLine '+resultCls+'">'+resultText+'</p>'+
-    (showLoot ? '<div class="lootRevealRow">'+h.loot.map(function(loot,i){ return lootCard(loot, h.seq+'|'+i); }).join('')+'</div>' : '');
+    (showLoot ? '<div class="lootRevealRow">'+h.loot.map(function(loot,i){ return lootCard(loot, loot.gearSeed!==undefined ? loot.gearSeed : h.seq+'|'+i); }).join('')+'</div>' : '');
   
   if(key!==lastRollKeyForSfx){
     lastRollKeyForSfx=key;
@@ -1274,11 +1263,11 @@ function renderDuel(){
   const overlay=document.getElementById('duelOverlay');
   if(!overlay) return;
   const rollBtn=document.getElementById('duelRollBtn');
-  const pending=state.pendingRaid;
+  const pending=state.pendingDuel;
   const d=state.lastDuel;
   if(pending && (!d || d.seq!==pending.seq)){
     const atk=state.guilds[pending.atkIdx], def=state.guilds[pending.defIdx];
-    document.getElementById('duelTypeLabel').textContent='RAID';
+    document.getElementById('duelTypeLabel').textContent = pending.type==='sabotage' ? 'SABOTAGE' : 'RAID';
     document.getElementById('duelAtkName').textContent=atk.name;
     document.getElementById('duelDefName').textContent=def.name;
     const atkBonus=raidGearBonus(atk), defBonus=raidGearBonus(def);
@@ -1694,7 +1683,7 @@ function commitLootCard(g, kind, floorIdx){
   if(kind==='broken'){
     if(g.gear.length>=GEAR_SLOTS) return null;
     g.gear.push('Broken Gear');
-    return {kind:'broken', name:'Broken Gear', label:'a piece of Broken Gear'};
+    return {kind:'broken', name:'Broken Gear', label:'a piece of Broken Gear', gearSeed:g.name+'|'+(g.gear.length-1)};
   }
   const f=floors[floorIdx];
   if(state.pools[floorIdx]<=0 || !addMat(g,f.name,1)) return null;
@@ -1796,7 +1785,7 @@ function huntAction(useBrokenGear){
   }
 
   const behind=trailing();
-  const curseAmount=g.hexCurse?(g.hexCurseHeavy?2:1):0;
+  const curseAmount=g.hexCurse?(g.hexCurseHeavy?3:2):0;
   let total=d1+d2+bowBonus+swordBonus+brokenBonus+(behind?1:0)-curseAmount;
   g.ap-=1;
   state.rollSeq=(state.rollSeq||0)+1;
@@ -1857,6 +1846,7 @@ function trainAction(){
 function raidAction(targetIdx, wagerMat){
   const g=me();
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
+  if(state.pendingDuel) return;
   const targets=others();
   if(!targets.length) return;
   let defIdx=targetIdx;
@@ -1873,21 +1863,25 @@ function raidAction(targetIdx, wagerMat){
     return;
   }
   state.rollSeq=(state.rollSeq||0)+1;
-  state.pendingRaid = { seq: state.rollSeq, atkIdx: state.current, defIdx: defIdx, wagerMat: wagering?wagerMat:null, atkRoll:null, defRoll:null };
+  state.pendingDuel = { type:'raid', seq: state.rollSeq, atkIdx: state.current, defIdx: defIdx, wagerMat: wagering?wagerMat:null, atkRoll:null, defRoll:null };
 }
-// Raid is now a face-off both sides actually play: the attacker rolls their
-// own dice, then the defender rolls theirs (on their own device in online
-// play), and only once both are in does the outcome resolve. Bots roll
-// their side automatically via maybeBotRaidRoll, whichever side they're on.
-function rollRaidSide(side){
-  const pr=state.pendingRaid;
+// Raid and Sabotage are both face-offs both sides actually play: the
+// attacker rolls their own dice, then the defender rolls theirs (on their
+// own device in online play), and only once both are in does the outcome
+// resolve. Bots roll their side automatically via maybeBotDuelRoll,
+// whichever side they're on.
+function rollDuelSide(side){
+  const pr=state.pendingDuel;
   if(!pr) return;
   if(side==='atk'){ if(pr.atkRoll) return; pr.atkRoll={ d1:1+Math.floor(Math.random()*6), d2:1+Math.floor(Math.random()*6) }; }
   else { if(pr.defRoll) return; pr.defRoll={ d1:1+Math.floor(Math.random()*6), d2:1+Math.floor(Math.random()*6) }; }
-  if(pr.atkRoll && pr.defRoll) finalizeRaid();
+  if(pr.atkRoll && pr.defRoll){
+    if(pr.type==='sabotage') finalizeSabotage();
+    else finalizeRaid();
+  }
 }
 function finalizeRaid(){
-  const pending=state.pendingRaid;
+  const pending=state.pendingDuel;
   if(!pending || !pending.atkRoll || !pending.defRoll) return;
   const g=state.guilds[pending.atkIdx], t=state.guilds[pending.defIdx];
   const wagerMat=pending.wagerMat, wagering=!!wagerMat;
@@ -1923,7 +1917,7 @@ function finalizeRaid(){
     defName:t.name, dd1:dd1, dd2:dd2, defBonus:defBonus, defScore:defScore,
     win:win, resultText:resultText
   };
-  state.pendingRaid=null;
+  state.pendingDuel=null;
 }
 function raidGearBonus(g){
   let bonus=0;
@@ -1938,17 +1932,25 @@ function raidGearBonus(g){
 function sabotageAction(targetIdx, payMat, allIn){
   const g=me();
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
+  if(state.pendingDuel) return;
   const cost=allIn?2:1;
   if(!payMat || (g.mat[payMat]||0)<cost){ addLog(g.name+' does not have '+cost+' '+ (payMat||'material') +' to spend on '+(allIn?'an all-in curse':'a curse')+'.'); return; }
   const t=state.guilds[targetIdx];
   spendMat(g,payMat,cost);
   g.ap-=1;
-  const ad1=1+Math.floor(Math.random()*6), ad2=1+Math.floor(Math.random()*6);
-  const dd1=1+Math.floor(Math.random()*6), dd2=1+Math.floor(Math.random()*6);
+  state.rollSeq=(state.rollSeq||0)+1;
+  state.pendingDuel = { type:'sabotage', seq: state.rollSeq, atkIdx: state.current, defIdx: targetIdx, payMat: payMat, allIn: !!allIn, atkRoll:null, defRoll:null };
+}
+function finalizeSabotage(){
+  const pending=state.pendingDuel;
+  if(!pending || !pending.atkRoll || !pending.defRoll) return;
+  const g=state.guilds[pending.atkIdx], t=state.guilds[pending.defIdx];
+  const payMat=pending.payMat, allIn=pending.allIn;
+  const ad1=pending.atkRoll.d1, ad2=pending.atkRoll.d2;
+  const dd1=pending.defRoll.d1, dd2=pending.defRoll.d2;
   const atkBonus=raidGearBonus(g), defBonus=raidGearBonus(t);
   const atkScore=ad1+ad2+atkBonus, defScore=dd1+dd2+defBonus;
   const win=atkScore>defScore;
-  state.rollSeq=(state.rollSeq||0)+1;
   let resultText;
   if(!win){
     resultText=t.name+' resists the curse!';
@@ -1958,19 +1960,20 @@ function sabotageAction(targetIdx, payMat, allIn){
     if(allIn){
       t.hexCurseHeavy=true;
       if(t.progress>0) t.progress-=1;
-      resultText=t.name+"'s next Hunt takes -2, and they lose 1 progress now.";
-      addLog(g.name+' goes all-in, spending 2 '+payMat+' to curse '+t.name+' ('+atkScore+' vs '+defScore+'): their next Hunt total takes -2, and they lose 1 progress right now.', 'ev');
+      resultText=t.name+"'s next Hunt takes -3, and they lose 1 progress now.";
+      addLog(g.name+' goes all-in, spending 2 '+payMat+' to curse '+t.name+' ('+atkScore+' vs '+defScore+'): their next Hunt total takes -3, and they lose 1 progress right now.', 'ev');
     } else {
-      resultText=t.name+"'s next Hunt takes -1.";
-      addLog(g.name+' spends 1 '+payMat+' to curse '+t.name+' ('+atkScore+' vs '+defScore+'): their next Hunt total takes -1.', 'ev');
+      resultText=t.name+"'s next Hunt takes -2.";
+      addLog(g.name+' spends 1 '+payMat+' to curse '+t.name+' ('+atkScore+' vs '+defScore+'): their next Hunt total takes -2.', 'ev');
     }
   }
   state.lastDuel={
-    seq: state.rollSeq, type:'sabotage',
+    seq: pending.seq, type:'sabotage',
     atkName:g.name, ad1:ad1, ad2:ad2, atkBonus:atkBonus, atkScore:atkScore,
     defName:t.name, dd1:dd1, dd2:dd2, defBonus:defBonus, defScore:defScore,
     win:win, resultText:resultText
   };
+  state.pendingDuel=null;
 }
 function affordGear(g,cost){ return canAfford(g,cost); }
 function payGear(g,cost){ payCost(g,cost); }
@@ -2098,7 +2101,7 @@ document.getElementById('btnSendRaid').onclick=function(){
 document.getElementById('duelRollBtn').onclick=function(){
   const side=this.dataset.side;
   if(!side) return;
-  withState(function(){ rollRaidSide(side); });
+  withState(function(){ rollDuelSide(side); });
 };
 let transmutePicks={};
 function renderTransmutePicker(){
@@ -2166,7 +2169,7 @@ document.getElementById('btnCancelTrade').onclick=function(){ document.getElemen
 document.getElementById('btnSabotageToggle').onclick=function(){
   showOnlyPanel('sabotagePanel'); refreshTargetSelects();
   coachTip('sabotage', document.getElementById('sabMat'),
-    'Spend 1 material to try to curse a rival: their next Hunt total takes -1, but they get a resist roll first. Go all-in to spend 2 instead, for a -2 curse and an immediate 1 progress hit if it lands.');
+    'Spend 1 material to try to curse a rival: their next Hunt total takes -2, but they get a resist roll first. Go all-in to spend 2 instead, for a -3 curse and an immediate 1 progress hit if it lands.');
 };
 document.getElementById('btnCancelSabotage').onclick=function(){ document.getElementById('sabotagePanel').classList.remove('show'); };
 document.getElementById('btnSendSabotage').onclick=function(){
@@ -2234,7 +2237,7 @@ function renderBlacksmithShop(){
 
 function isBotDriver(){ return LOCAL_MODE || myGuildIndex===0; }
 
-const INACTIVITY_MS = 2*60*1000;
+const INACTIVITY_MS = 60*1000;
 function maybeSkipInactivePlayer(){
   if(LOCAL_MODE || myGuildIndex!==0) return;
   if(!state || (state.winner!==null && state.winner!==undefined)) return;
@@ -2273,6 +2276,7 @@ function maybeBotContinue(){
 function botStep(){
   if(!state) return;
   if(state.winner!==null && state.winner!==undefined) return;
+  if(state.pendingDuel) return;
   const g=me();
   if(!g.isBot) return;
   const f=floors[g.idx];

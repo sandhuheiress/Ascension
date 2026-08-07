@@ -6,7 +6,7 @@
 <title>Ascension: Hunter's Tower</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=21">
+<link rel="stylesheet" href="style.css?v=22">
 </head>
 <body>
 
@@ -193,23 +193,6 @@
 
   <div id="eventToastStack"></div>
 
-  <div class="hudTop">
-    <div class="gameHead">
-      <span class="roomTag" id="roomTag"></span>
-      <div style="display:flex; align-items:center; gap:10px;">
-        <div class="avatarRow" id="headerAvatars"></div>
-        <button class="howBtn" id="btnSound" title="Sound on or off">&#x1F50A;</button>
-        <button class="howBtn" id="btnSpeed" title="AI turn speed">1x</button>
-        <button class="howBtn" id="btnPause" title="Pause">&#x23F8;&#xFE0F;</button>
-        <button class="howBtn" id="btnHowToGame">How to play</button>
-        <button class="leaveBtn" id="btnEndGame" title="Call it and see who's ahead">End game</button>
-        <button class="leaveBtn" id="btnLeaveGame">Leave game</button>
-      </div>
-    </div>
-    <div class="turnBanner glass" id="turnBanner"></div>
-    <div id="outbreakBadge" class="outbreakBadge glass"></div>
-  </div>
-
   <div class="hudLeft">
     <div id="myPlacemat" class="placemat glass">
       <h4>Your Supplies</h4>
@@ -288,7 +271,7 @@
           <div class="field"><label>Target</label><select id="sabTarget"></select></div>
           <div class="field"><label>Pay with</label><select id="sabMat"></select></div>
         </div>
-        <label class="wagerRow"><input type="checkbox" id="sabWagerToggle"><span>All-in: spend 2 instead of 1. Curse doubles to -2, and they lose 1 progress right now too.</span></label>
+        <label class="wagerRow"><input type="checkbox" id="sabWagerToggle"><span>All-in: spend 2 instead of 1. Curse jumps to -3, and they lose 1 progress right now too.</span></label>
         <div class="submitRow">
           <button class="act raid" id="btnSendSabotage">Cast curse</button>
           <button class="act" id="btnCancelSabotage">Cancel</button>
@@ -317,6 +300,23 @@
       </div>
 
   </div>
+</div>
+
+<div class="hudTop">
+  <div class="gameHead">
+    <span class="roomTag" id="roomTag"></span>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="avatarRow" id="headerAvatars"></div>
+      <button class="howBtn" id="btnSound" title="Sound on or off">&#x1F50A;</button>
+      <button class="howBtn" id="btnSpeed" title="AI turn speed">1x</button>
+      <button class="howBtn" id="btnPause" title="Pause">&#x23F8;&#xFE0F;</button>
+      <button class="howBtn" id="btnHowToGame">How to play</button>
+      <button class="leaveBtn" id="btnEndGame" title="Call it and see who's ahead">End game</button>
+      <button class="leaveBtn" id="btnLeaveGame">Leave game</button>
+    </div>
+  </div>
+  <div class="turnBanner glass" id="turnBanner"></div>
+  <div id="outbreakBadge" class="outbreakBadge glass"></div>
 </div>
 
 <div class="modalOverlay" id="seatingRollOverlay">
@@ -371,7 +371,7 @@
     <div class="howRow"><span class="htxt"><b>Train:</b> spend 2 of the current floor's material for a guaranteed +1 progress, no roll. The reliable way to climb when the dice aren't cooperating.</span></div>
     <div class="howRow"><span class="htxt"><b>Raid:</b> pick a target and steal 1 random material. Both sides then roll 2d6 plus gear bonuses (basic gear +2, upgraded +3, an equipped accessory +1); higher score lands it, ties favor the defender. Broken Gear stays Hunt-only and never adds to a Raid roll. Go <b>all-in</b> to wager a material: win, and you keep it plus knock the target down 1 progress; lose, and they keep your stake.</span></div>
     <div class="howRow"><span class="htxt"><b>Trade:</b> a want-board, not a one-to-one proposal. Post what material you need, and any guild can pitch what they'd take for it. Accept whichever offer you like, decline one without cancelling your want, or cancel the want outright. One active want per guild at a time, free to post, pitch, decline, or accept.</span></div>
-    <div class="howRow"><span class="htxt"><b>Sabotage:</b> spend 1 material to try to curse a rival &mdash; both sides roll 2d6 plus gear bonuses, and they resist it on a tie or better. Land it, and their next Hunt total takes -1. Go <b>all-in</b> to spend 2 instead: land it for a -2 curse and an immediate 1 progress loss.</span></div>
+    <div class="howRow"><span class="htxt"><b>Sabotage:</b> spend 1 material to try to curse a rival &mdash; both sides roll 2d6 plus gear bonuses, and they resist it on a tie or better. Land it, and their next Hunt total takes -2. Go <b>all-in</b> to spend 2 instead: land it for a -3 curse and an immediate 1 progress loss.</span></div>
     <div class="howRow"><span class="htxt"><b>Blacksmith:</b> craft Basic Bow (2 Kasaka Fang, reroll a die) or Basic Sword (2 Golem Crystal, +2 total), upgrade them, or craft accessories: Shield (blocks a natural-2 penalty), Lucky Coin (+1 loot on success), Compass (+1 progress on success), Ironclad Ward (blocks the next Raid against you outright). 3 item slots, only 1 accessory at a time.</span></div>
     <div class="howRow"><span class="htxt"><b>Shadow Transmutation:</b> discard any 3 materials, in any mix, to receive 1 material of your choice. Free, and repeatable as long as you have the materials and a slot for the result.</span></div>
     <div class="howRow"><span class="htxt"><b>Ascend:</b> 1 AP. Once you meet the progress requirement and hold the toll material, move up to the next floor. <b>Floors 3, 5 and 6 also need a Floor Key</b>: Vanguard's Sigil (1 Kasaka Fang + 1 Golem Crystal), Kaisel Ward (1 Orc Tusk + 1 Oracle Wisp), Sovereign's Bane (1 Kaisel Scale + 1 Kasaka Fang). A Key is crafted and spent in the same instant, so it never takes a slot, and the last one reaches back to Floor 1 on purpose.</span></div>
@@ -387,6 +387,6 @@
   </div>
 </div>
 
-<script type="module" src="game.js?v=21"></script>
+<script type="module" src="game.js?v=22"></script>
 </body>
 </html>
