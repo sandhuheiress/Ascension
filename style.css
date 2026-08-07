@@ -1604,7 +1604,11 @@ body.in-game .heroWrap { display: none; }
   }
 
   .lootRevealRow .lootCard {
-    position: static;
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
     margin: 0;
   }
 
@@ -2430,7 +2434,11 @@ body.in-game .heroWrap { display: none; }
   }
 
   #lootChoiceBanner .lcOption .lootCard {
-    position: static;
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
     margin: 0;
     animation: none;
   }
@@ -2528,7 +2536,11 @@ body.in-game .heroWrap { display: none; }
   }
 
   #brokenEquipBanner .lcOptions .lootCard {
-    position: static;
+    position: relative;
+    top: auto;
+    right: auto;
+    bottom: auto;
+    left: auto;
     margin: 0;
   }
 

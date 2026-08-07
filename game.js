@@ -178,8 +178,15 @@ setInterval(updateTurnTimerDisplay, 1000);
 let tutorialOn=false, tutorialPrompted=false, tutorialChoiceMade=false, gamePaused=false;
 const seenTips=new Set();
 function isPaused(){ return LOCAL_MODE ? gamePaused : !!(state && state.paused); }
+// Keep the board frozen for a moment after a Raid/Sabotage (or anything
+// else that shares the pendingDuel/lastDuel system) resolves, so the next
+// turn doesn't start — and steal the overlay — while the result is still
+// being shown.
+function duelRevealActive(){
+  return !!(state && state.lastDuel && Date.now()-(state.lastDuel.at||0)<DUEL_REVEAL_MS);
+}
 function isFrozen(){
-  return isPaused() || !tutorialChoiceMade || document.getElementById('seatingRollOverlay').classList.contains('show');
+  return isPaused() || !tutorialChoiceMade || document.getElementById('seatingRollOverlay').classList.contains('show') || duelRevealActive();
 }
 function showGame(){
   screens().forEach(function(s){ document.getElementById(s).style.display='none'; });
@@ -808,12 +815,23 @@ function rollMySeat(idx){
   if(sr.rolls[idx]!==undefined) return;
   sr.rolls[idx]=2+Math.floor(Math.random()*6)+Math.floor(Math.random()*6);
   if(Object.keys(sr.rolls).length<state.guilds.length) return;
-  let best=-1, first=0;
-  state.guilds.forEach(function(g,i){ if(sr.rolls[i]>best){ best=sr.rolls[i]; first=i; } });
+  let best=-1;
+  state.guilds.forEach(function(g,i){ if(sr.rolls[i]>best) best=sr.rolls[i]; });
+  const tied=state.guilds.map(function(g,i){return i;}).filter(function(i){ return sr.rolls[i]===best; });
+  const summary='Seating roll: '+state.guilds.map(function(g,i){return g.name+' '+sr.rolls[i];}).join(', ')+'. ';
+  if(tied.length>1){
+    // A tie for the lead rerolls just the tied guilds instead of picking
+    // one of them arbitrarily — everyone else's roll stands.
+    const names=tied.map(function(i){ return state.guilds[i].name; }).join(' and ');
+    state.log.unshift({t:summary+'Tied for the lead at '+best+' — '+names+' roll again.', cls:''});
+    tied.forEach(function(i){ delete sr.rolls[i]; });
+    return;
+  }
+  const first=tied[0];
   sr.done=true;
   sr.winnerIdx=first;
   state.current=first; state.round=1; state.turnStartedAt=Date.now();
-  state.log.unshift({t:'Seating roll: '+state.guilds.map(function(g,i){return g.name+' '+sr.rolls[i];}).join(', ')+'. '+state.guilds[first].name+' goes first.', cls:''});
+  state.log.unshift({t:summary+state.guilds[first].name+' goes first.', cls:''});
 }
 
 function canAfford(g,cost){ return Object.keys(cost).every(function(m){ return (g.mat[m]||0)>=cost[m]; }); }
@@ -1327,7 +1345,14 @@ function renderDuel(){
   SFX.roll();
   setTimeout(function(){ (d.win?SFX.success:SFX.fail)(); }, 460);
   const key=d.seq;
-  setTimeout(function(){ if(lastDuelKey===key) overlay.classList.remove('show'); }, DUEL_REVEAL_MS);
+  setTimeout(function(){
+    if(lastDuelKey!==key) return;
+    overlay.classList.remove('show');
+    // The board was frozen (isFrozen -> duelRevealActive) while this was
+    // showing; nothing else would trigger a re-render once that timer
+    // lapses on its own, so nudge the game forward here.
+    if(state) render();
+  }, DUEL_REVEAL_MS);
 }
 
 function refreshTargetSelects(){
@@ -1469,16 +1494,15 @@ function renderLootChoice(){
         : {kind:'mat', floor:opt.floorIdx, name:floors[opt.floorIdx].name};
       return '<button class="lcOption" type="button" data-i="'+i+'">'+lootCard(preview,i)+'</button>';
     }).join('');
-    banner.innerHTML = '<div class="lcTitle">Extra loot — keep which one'+(pl.options.length>1?'s':'')+'?</div><div class="lcOptions">'+optionsHtml+'</div>'+
-      (pl.options.length>1 ? '<div class="btnRow" style="margin-top:10px;"><button class="ghost-btn" id="btnSkipLoot">Leave the rest</button></div>' : '');
+    banner.innerHTML = '<div class="lcTitle">Extra loot — choose which one'+(pl.options.length>1?'s':'')+' you want</div><div class="lcOptions">'+optionsHtml+'</div>'+
+      '<div class="btnRow" style="margin-top:10px;"><button class="ghost-btn" id="btnSkipLoot">Drop the rest</button></div>';
     banner.querySelectorAll('.lcOption').forEach(function(btn){
       btn.onclick=function(){
         const i=parseInt(btn.dataset.i,10);
         withState(function(){ claimLoot(i); });
       };
     });
-    const skipBtn=document.getElementById('btnSkipLoot');
-    if(skipBtn) skipBtn.onclick=function(){ withState(function(){ dismissPendingLoot(); }); };
+    document.getElementById('btnSkipLoot').onclick=function(){ withState(function(){ dismissPendingLoot(); }); };
   } else {
     banner.classList.remove('show');
     banner.innerHTML='';
@@ -1912,7 +1936,7 @@ function finalizeRaid(){
     if(wagering) resultText+=' '+t.name+' also loses 1 progress.';
   }
   state.lastDuel={
-    seq: pending.seq, type:'raid',
+    seq: pending.seq, type:'raid', at: Date.now(),
     atkName:g.name, ad1:ad1, ad2:ad2, atkBonus:atkBonus, atkScore:atkScore,
     defName:t.name, dd1:dd1, dd2:dd2, defBonus:defBonus, defScore:defScore,
     win:win, resultText:resultText
@@ -1968,7 +1992,7 @@ function finalizeSabotage(){
     }
   }
   state.lastDuel={
-    seq: pending.seq, type:'sabotage',
+    seq: pending.seq, type:'sabotage', at: Date.now(),
     atkName:g.name, ad1:ad1, ad2:ad2, atkBonus:atkBonus, atkScore:atkScore,
     defName:t.name, dd1:dd1, dd2:dd2, defBonus:defBonus, defScore:defScore,
     win:win, resultText:resultText
@@ -2282,12 +2306,12 @@ function botStep(){
   const f=floors[g.idx];
   if(canAscend(g)){ withState(ascendAction); return; }
   const myWant=(state.tradeWants||[]).find(function(w){ return w.guildIdx===state.current; });
-  if(myWant && (myWant.offers||[]).length && Math.random()<0.6){
+  if(myWant && (myWant.offers||[]).length && Math.random()<0.85){
     const pick=myWant.offers[Math.floor(Math.random()*myWant.offers.length)];
     withState(function(){ acceptOffer(myWant.id, pick.id); });
     return;
   }
-  if(!myWant && Math.random()<0.25){
+  if(!myWant && Math.random()<0.45){
     const short=[];
     if((g.mat[f.name]||0)<f.toll) short.push(f.name);
     const key=keyFor(g.idx);
@@ -2302,14 +2326,19 @@ function botStep(){
     const have=g.mat[w.wantMat]||0;
     return have>=w.wantQty && (have-w.wantQty>=1 || have>2);
   });
-  if(pitchable && Math.random()<0.4){
+  if(pitchable && Math.random()<0.6){
     const spare=stockKeys(g).filter(function(k){ return k!==pitchable.wantMat; });
     const returnMat=spare.length ? spare[0] : floors[g.idx].name;
     withState(function(){ pitchOffer(pitchable.id, returnMat, 1); });
     return;
   }
   if(g.ap>0 && !canDoAnything(g) && !g.scavenged){ withState(scavengeAction); return; }
-  if(g.progress>=f.need && matTotal(g)>=TRANSMUTE_COST){
+  // Transmute and Craft are both free (no AP cost), so they're checked
+  // before the AP-exhaustion end-turn fallback below, and Transmute is no
+  // longer gated on already being ascend-ready — a bot with spare
+  // materials converts toward whatever toll/key material it's short on
+  // as soon as it can, instead of only at the last moment.
+  if(matTotal(g)>=TRANSMUTE_COST){
     const want=[];
     if((g.mat[f.name]||0)<f.toll) want.push(f.name);
     const key=keyFor(g.idx);
@@ -2317,12 +2346,13 @@ function botStep(){
     const gettable=want.filter(function(m){ const fi=floors.findIndex(function(fl){return fl.name===m;}); return fi<0 || state.pools[fi]>0; });
     if(gettable.length && canAdd(g,gettable[0])){ withState(function(){ transmuteAction(gettable[0]); }); return; }
   }
-  if(g.ap<=0){ withState(endTurnAction); return; }
-  if((g.gear||[]).length<2){
-    const options=eligibleGear(g).filter(function(name){ return GEAR[name].type==='weapon'; });
-    const craftable=options.find(function(name){ return affordGear(g,GEAR[name].cost); });
+  if((g.gear||[]).length<GEAR_SLOTS){
+    const options=eligibleGear(g);
+    const weapons=options.filter(function(name){ return GEAR[name].type==='weapon'; });
+    const craftable=weapons.find(function(name){ return affordGear(g,GEAR[name].cost); }) || options.find(function(name){ return affordGear(g,GEAR[name].cost); });
     if(craftable){ withState(function(){ craftAction(craftable); }); return; }
   }
+  if(g.ap<=0){ withState(endTurnAction); return; }
   if((g.mat[f.name]||0)>=2 && Math.random()<0.5){ withState(trainAction); return; }
   if(Math.random()<0.15 && others().length){
     const viable=others().filter(function(o){ return stockKeys(o.g).length; });
