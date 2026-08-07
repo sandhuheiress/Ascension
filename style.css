@@ -131,7 +131,13 @@
 }
 
 body.in-game .heroWrap { display: none; }
-  
+
+/* TEMP: main page is just the big centered title for now, per teammate request.
+   Remove this block to bring back the subtitle + Local/Online setup panel. */
+p.subtitle,
+#screenHome {
+  display: none;
+}
 
   p.subtitle {
     text-align: center;
