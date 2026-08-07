@@ -80,7 +80,7 @@ const GEAR_ICON={ 'Basic Bow':'\u{1F3F9}', 'Upgraded Bow':'\u{1F3F9}✨', 'Basic
 // so it skips the invert filter via the existing .ink modifier. Only 5 of the
 // 9 gear pieces have custom art so far — anything missing here just falls
 // back to its emoji, same as before.
-const GEAR_ART={ 'Basic Bow':'icon_basic_bow', 'Basic Sword':'icon_basic_sword', 'Compass':'icon_compass', 'Lucky Coin':'icon_lucky_coin', 'Shield':'icon_shield' };
+const GEAR_ART={ 'Basic Bow':'icon_basic_bow', 'Upgraded Bow':'icon_bow_upgraded',  'Basic Sword':'icon_basic_sword','Upgraded Sword':'icon_sword_upgraded', 'Compass':'icon_compass', 'Lucky Coin':'icon_lucky_coin', 'Shield':'icon_shield' };
 function gearIcon(name){
   const file=GEAR_ART[name];
   if(!file) return '<span class="ic">'+(GEAR_ICON[name]||'&#x1F392;')+'</span>';
