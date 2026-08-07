@@ -627,7 +627,7 @@ function myActiveIdx(){
 }
 function others(){ return state.guilds.map(function(g,i){return {g:g,i:i};}).filter(function(o){ return o.i!==state.current; }); }
 function trailing(){ const min=Math.min.apply(null, state.guilds.map(function(g){return g.idx;})); return me().idx===min && state.guilds.some(function(g){return g.idx>min;}); }
-function addLog(t, cls){ state.log = state.log||[]; state.log.unshift({t:t, cls:cls||''}); if(state.log.length>50) state.log=state.log.slice(0,50); }
+function addLog(t, cls){ state.log = state.log||[]; state.log.push({t:t, cls:cls||''}); if(state.log.length>50) state.log.shift(); }
 function capProgress(g){ const need=floors[g.idx].need; if(g.progress>need) g.progress=need; }
 function canAdd(g,name){ const mat=g.mat||{}; return mat.hasOwnProperty(name) || Object.keys(mat).length<CAP; }
 function addMat(g,name,qty){ if(!canAdd(g,name)) return false; g.mat=g.mat||{}; g.mat[name]=(g.mat[name]||0)+qty; return true; }
@@ -690,6 +690,7 @@ async function withState(fn){
   await pushState();
 }
 
+let lastLogCount=0;
 function render(){
   if(!state) return;
   renderSeatingRollOverlay();
@@ -805,7 +806,10 @@ function render(){
   if(canAct && !hasAP) coachTip('outOfAp', document.getElementById('btnEndTurn'),
     'Out of action points, but you\'re not stuck: Trade, Blacksmith, Transmute, and Ascend are all free. Check those before ending your turn.');
 
-  document.getElementById('log').innerHTML = (state.log||[]).map(function(l){return '<div class="'+(l.cls||'')+'">'+l.t+'</div>';}).join('');
+  const logEl=document.getElementById('log');
+  const logCount=(state.log||[]).length;
+  logEl.innerHTML = (state.log||[]).map(function(l){return '<div class="'+(l.cls||'')+'">'+l.t+'</div>';}).join('');
+  if(logCount!==lastLogCount){ lastLogCount=logCount; logEl.scrollTop=logEl.scrollHeight; }
 
   document.getElementById('headerAvatars').innerHTML = state.guilds.map(function(g,i){
     return '<div class="avatarChip art ink'+(i===state.current&&!won?' turn':'')+'" style="background:'+g.color+'; --art:'+art('guild',i+1)+'" title="'+g.name+'"></div>';
@@ -827,6 +831,7 @@ function render(){
   renderGearSwap();
   renderTower();
   renderDice();
+  renderDuel();
   if(document.getElementById('blacksmithPanel').classList.contains('show')) renderBlacksmithShop();
   maybeBotContinue();
 }
@@ -1085,6 +1090,57 @@ function renderDice(){
         : 'That\'s a natural 2 &mdash; normally it costs banked progress, punishing whoever\'s on your floor instead. No one was here this time.');
     }
   }
+}
+
+let lastDuelKey=null;
+let lastPendingKey=null;
+function renderDuel(){
+  const overlay=document.getElementById('duelOverlay');
+  if(!overlay) return;
+  const rollBtn=document.getElementById('duelRollBtn');
+  const pending=state.pendingRaid;
+  const d=state.lastDuel;
+  if(pending && (!d || d.seq!==pending.seq)){
+    if(pending.seq!==lastPendingKey){
+      lastPendingKey=pending.seq;
+      const atk=state.guilds[pending.atkIdx], def=state.guilds[pending.defIdx];
+      document.getElementById('duelTypeLabel').textContent='RAID';
+      document.getElementById('duelAtkName').textContent=atk.name;
+      document.getElementById('duelDefName').textContent=def.name;
+      document.getElementById('duelAtkDice').innerHTML=diceFace(1,'idle')+diceFace(1,'idle');
+      document.getElementById('duelDefDice').innerHTML=diceFace(1,'idle')+diceFace(1,'idle');
+      document.getElementById('duelAtkScore').textContent='';
+      document.getElementById('duelDefScore').textContent='';
+      const resultEl=document.getElementById('duelResultText');
+      resultEl.textContent='Ready to roll.';
+      resultEl.className='duelResultText';
+      overlay.classList.add('show');
+    }
+    rollBtn.style.display = isMyTurn() ? '' : 'none';
+    return;
+  }
+  rollBtn.style.display='none';
+  if(!d || d.seq===lastDuelKey) return;
+  lastDuelKey=d.seq;
+  document.getElementById('duelTypeLabel').textContent = d.type==='raid' ? 'RAID' : 'SABOTAGE';
+  document.getElementById('duelAtkName').textContent=d.atkName;
+  document.getElementById('duelDefName').textContent=d.defName;
+  document.getElementById('duelAtkDice').innerHTML=diceFace(d.ad1,'','duelA1')+diceFace(d.ad2,'','duelA2');
+  document.getElementById('duelDefDice').innerHTML=diceFace(d.dd1,'','duelD1')+diceFace(d.dd2,'','duelD2');
+  document.getElementById('duelAtkScore').textContent=d.atkScore+(d.atkBonus?' ('+(d.ad1+d.ad2)+'+'+d.atkBonus+')':'');
+  document.getElementById('duelDefScore').textContent=d.defScore+(d.defBonus?' ('+(d.dd1+d.dd2)+'+'+d.defBonus+')':'');
+  const resultEl=document.getElementById('duelResultText');
+  resultEl.textContent=d.resultText;
+  resultEl.className='duelResultText '+(d.win?'win':'lose');
+  overlay.classList.add('show');
+  throwDie(document.getElementById('duelA1'), d.ad1);
+  throwDie(document.getElementById('duelA2'), d.ad2);
+  throwDie(document.getElementById('duelD1'), d.dd1);
+  throwDie(document.getElementById('duelD2'), d.dd2);
+  SFX.roll();
+  setTimeout(function(){ (d.win?SFX.success:SFX.fail)(); }, 460);
+  const key=d.seq;
+  setTimeout(function(){ if(lastDuelKey===key) overlay.classList.remove('show'); }, DUEL_REVEAL_MS);
 }
 
 function refreshTargetSelects(){
@@ -1597,14 +1653,19 @@ function trainAction(){
   if((g.mat[f.name]||0)>=2){ spendMat(g,f.name,2); g.progress+=1; capProgress(g); g.ap-=1; addLog(g.name+' trains using 2 '+f.name+', guaranteed +1 progress.'); SFX.click(); }
   else addLog(g.name+' needs 2 '+f.name+' in storage to train.');
 }
-function raidAction(targetIdx, wagerMat){
+// commits to a raid (spends the AP, locks in target and wager) but doesn't
+// roll yet — a human player rolls their own dice via the duel overlay's
+// Roll button; a bot's turn rolls immediately since nothing is waiting on it
+function raidAction(targetIdx, wagerMat, autoResolve){
   const g=me();
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
   const targets=others();
   if(!targets.length) return;
-  const t = targetIdx!==undefined && targetIdx!==null && state.guilds[targetIdx]
-    ? state.guilds[targetIdx]
-    : targets[Math.floor(Math.random()*targets.length)].g;
+  let defIdx=targetIdx;
+  if(defIdx===undefined || defIdx===null || !state.guilds[defIdx]){
+    defIdx = targets[Math.floor(Math.random()*targets.length)].i;
+  }
+  const t = state.guilds[defIdx];
   const wagering = !!wagerMat && (g.mat[wagerMat]||0)>=1;
   g.ap-=1;
   if((t.gear||[]).includes('Ironclad Ward')){
@@ -1613,29 +1674,48 @@ function raidAction(targetIdx, wagerMat){
     SFX.fail();
     return;
   }
-  SFX.roll();
+  state.rollSeq=(state.rollSeq||0)+1;
+  state.pendingRaid = { seq: state.rollSeq, atkIdx: state.current, defIdx: defIdx, wagerMat: wagering?wagerMat:null };
+  if(autoResolve) resolveRaidRoll();
+}
+function resolveRaidRoll(){
+  const pending=state.pendingRaid;
+  if(!pending) return;
+  const g=state.guilds[pending.atkIdx], t=state.guilds[pending.defIdx];
+  const wagerMat=pending.wagerMat, wagering=!!wagerMat;
   const ad1=1+Math.floor(Math.random()*6), ad2=1+Math.floor(Math.random()*6);
   const dd1=1+Math.floor(Math.random()*6), dd2=1+Math.floor(Math.random()*6);
   const atkBonus=raidGearBonus(g), defBonus=raidGearBonus(t);
   const atkScore=ad1+ad2+atkBonus, defScore=dd1+dd2+defBonus;
-  if(atkScore<=defScore){
+  const win=atkScore>defScore;
+  let resultText;
+  if(!win){
     let msg=g.name+' raids '+t.name+' and loses the roll, '+atkScore+' ('+ad1+'+'+ad2+'+'+atkBonus+') vs '+defScore+' ('+dd1+'+'+dd2+'+'+defBonus+'), fought off.';
+    resultText='Fought off!';
     if(wagering){
       spendMat(g,wagerMat,1);
       addMat(t,wagerMat,1);
       msg+=' Going all-in cost '+g.name+' its wagered '+wagerMat+' — '+t.name+' keeps it.';
+      resultText+=' '+g.name+' loses its wagered '+wagerMat+'.';
     }
     addLog(msg);
-    setTimeout(SFX.fail, 350);
-    return;
+  } else {
+    const allInTag = wagering ? ' All-in pays off: '+t.name+' also loses 1 progress, and '+g.name+' keeps its wager.' : '';
+    if(wagering && t.progress>0) t.progress-=1;
+    const s=steal(t,g);
+    addLog((s
+      ? (g.name+' raids '+t.name+': '+atkScore+' vs '+defScore+', stealing 1 '+s+'.')
+      : (g.name+' raids '+t.name+' and wins the roll, '+atkScore+' vs '+defScore+', but they had nothing to take.'))+allInTag, 'st');
+    resultText = s ? ('Steals 1 '+s+'!') : 'Wins, but there was nothing to take.';
+    if(wagering) resultText+=' '+t.name+' also loses 1 progress.';
   }
-  setTimeout(SFX.success, 350);
-  const allInTag = wagering ? ' All-in pays off: '+t.name+' also loses 1 progress, and '+g.name+' keeps its wager.' : '';
-  if(wagering && t.progress>0) t.progress-=1;
-  const s=steal(t,g);
-  addLog((s
-    ? (g.name+' raids '+t.name+': '+atkScore+' vs '+defScore+', stealing 1 '+s+'.')
-    : (g.name+' raids '+t.name+' and wins the roll, '+atkScore+' vs '+defScore+', but they had nothing to take.'))+allInTag, 'st');
+  state.lastDuel={
+    seq: pending.seq, type:'raid',
+    atkName:g.name, ad1:ad1, ad2:ad2, atkBonus:atkBonus, atkScore:atkScore,
+    defName:t.name, dd1:dd1, dd2:dd2, defBonus:defBonus, defScore:defScore,
+    win:win, resultText:resultText
+  };
+  state.pendingRaid=null;
 }
 function raidGearBonus(g){
   let bonus=0;
@@ -1646,6 +1726,43 @@ function raidGearBonus(g){
     else if(name==='Lucky Coin' || name==='Compass') bonus += 1;
   });
   return bonus;
+}
+function sabotageAction(targetIdx, payMat, allIn){
+  const g=me();
+  if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
+  const cost=allIn?2:1;
+  if(!payMat || (g.mat[payMat]||0)<cost){ addLog(g.name+' does not have '+cost+' '+ (payMat||'material') +' to spend on '+(allIn?'an all-in curse':'a curse')+'.'); return; }
+  const t=state.guilds[targetIdx];
+  spendMat(g,payMat,cost);
+  g.ap-=1;
+  const ad1=1+Math.floor(Math.random()*6), ad2=1+Math.floor(Math.random()*6);
+  const dd1=1+Math.floor(Math.random()*6), dd2=1+Math.floor(Math.random()*6);
+  const atkBonus=raidGearBonus(g), defBonus=raidGearBonus(t);
+  const atkScore=ad1+ad2+atkBonus, defScore=dd1+dd2+defBonus;
+  const win=atkScore>defScore;
+  state.rollSeq=(state.rollSeq||0)+1;
+  let resultText;
+  if(!win){
+    resultText=t.name+' resists the curse!';
+    addLog(g.name+' tries to curse '+t.name+' ('+atkScore+' vs '+defScore+'), but they resist it.', 'st');
+  } else {
+    t.hexCurse=true;
+    if(allIn){
+      t.hexCurseHeavy=true;
+      if(t.progress>0) t.progress-=1;
+      resultText=t.name+"'s next Hunt takes -2, and they lose 1 progress now.";
+      addLog(g.name+' goes all-in, spending 2 '+payMat+' to curse '+t.name+' ('+atkScore+' vs '+defScore+'): their next Hunt total takes -2, and they lose 1 progress right now.', 'ev');
+    } else {
+      resultText=t.name+"'s next Hunt takes -1.";
+      addLog(g.name+' spends 1 '+payMat+' to curse '+t.name+' ('+atkScore+' vs '+defScore+'): their next Hunt total takes -1.', 'ev');
+    }
+  }
+  state.lastDuel={
+    seq: state.rollSeq, type:'sabotage',
+    atkName:g.name, ad1:ad1, ad2:ad2, atkBonus:atkBonus, atkScore:atkScore,
+    defName:t.name, dd1:dd1, dd2:dd2, defBonus:defBonus, defScore:defScore,
+    win:win, resultText:resultText
+  };
 }
 function affordGear(g,cost){ return canAfford(g,cost); }
 function payGear(g,cost){ payCost(g,cost); }
@@ -1767,6 +1884,10 @@ document.getElementById('btnSendRaid').onclick=function(){
   document.getElementById('raidWagerToggle').checked=false;
   document.getElementById('raidWagerRow').style.display='none';
 };
+document.getElementById('duelRollBtn').onclick=function(){
+  if(!isMyTurn()) return;
+  withState(resolveRaidRoll);
+};
 let transmutePicks={};
 function renderTransmutePicker(){
   const g=me();
@@ -1811,7 +1932,7 @@ document.getElementById('btnTransmute').onclick=function(){
   transmutePicks={};
   renderTransmutePicker();
   coachTip('transmute', document.getElementById('transmutePicker'),
-    'Pick exactly '+TRANSMUTE_COST+' materials, in any mix, to discard for 1 of your choice. Free and repeatable — the reliable way to turn junk you\'re holding into what you actually need, without touching what you're saving.');
+    'Pick exactly '+TRANSMUTE_COST+' materials, in any mix, to discard for 1 of your choice. Free and repeatable — the reliable way to turn junk you\'re holding into what you actually need, without touching what you\'re saving.');
 };
 document.getElementById('btnCancelTransmute').onclick=function(){ document.getElementById('transmutePanel').classList.remove('show'); };
 document.getElementById('btnDoTransmute').onclick=function(){
@@ -1833,7 +1954,7 @@ document.getElementById('btnCancelTrade').onclick=function(){ document.getElemen
 document.getElementById('btnSabotageToggle').onclick=function(){
   showOnlyPanel('sabotagePanel'); refreshTargetSelects();
   coachTip('sabotage', document.getElementById('sabMat'),
-    'Spend 1 material to curse a rival: their next Hunt total takes -1. Cheap, but it still costs an action point to cast. Go all-in to spend 2 instead, for a -2 curse and an immediate 1 progress hit.');
+    'Spend 1 material to try to curse a rival: their next Hunt total takes -1, but they get a resist roll first. Go all-in to spend 2 instead, for a -2 curse and an immediate 1 progress hit if it lands.');
 };
 document.getElementById('btnCancelSabotage').onclick=function(){ document.getElementById('sabotagePanel').classList.remove('show'); };
 document.getElementById('btnSendSabotage').onclick=function(){
@@ -1841,24 +1962,7 @@ document.getElementById('btnSendSabotage').onclick=function(){
   const targetIdx=parseInt(document.getElementById('sabTarget').value,10);
   const payMat=document.getElementById('sabMat').value;
   const allIn=document.getElementById('sabWagerToggle').checked;
-  withState(function(){
-    const g=me();
-    if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
-    const cost=allIn?2:1;
-    if(!payMat || (g.mat[payMat]||0)<cost){ addLog(g.name+' does not have '+cost+' '+ (payMat||'material') +' to spend on '+(allIn?'an all-in curse':'a curse')+'.'); return; }
-    spendMat(g,payMat,cost);
-    g.ap-=1;
-    const t=state.guilds[targetIdx];
-    t.hexCurse=true;
-    if(allIn){
-      t.hexCurseHeavy=true;
-      if(t.progress>0) t.progress-=1;
-      addLog(g.name+' goes all-in, spending 2 '+payMat+' to curse '+t.name+': their next Hunt total takes -2, and they lose 1 progress right now.', 'ev');
-    } else {
-      addLog(g.name+' spends 1 '+payMat+' to curse '+t.name+': their next Hunt total takes -1.', 'ev');
-    }
-    SFX.click();
-  });
+  withState(function(){ sabotageAction(targetIdx, payMat, allIn); });
   document.getElementById('sabotagePanel').classList.remove('show');
   document.getElementById('sabWagerToggle').checked=false;
 };
@@ -2002,7 +2106,7 @@ function botStep(){
     const pick=pool[Math.floor(Math.random()*pool.length)];
     const spareKeys=stockKeys(g);
     const wagerMat = spareKeys.length>=2 && Math.random()<0.35 ? spareKeys[Math.floor(Math.random()*spareKeys.length)] : null;
-    withState(function(){ raidAction(pick.i, wagerMat); });
+    withState(function(){ raidAction(pick.i, wagerMat, true); });
     return;
   }
   if(Math.random()<0.1 && others().length && stockKeys(g).length){
@@ -2013,20 +2117,7 @@ function botStep(){
       const allIn=keys.length>=2 && (g.mat[keys[0]]||0)>=2 && Math.random()<0.3;
       const payMat=keys.find(function(k){ return (g.mat[k]||0)>=(allIn?2:1); });
       if(payMat){
-        withState(function(){
-          const cost=allIn?2:1;
-          spendMat(g,payMat,cost);
-          g.ap-=1;
-          pick.g.hexCurse=true;
-          if(allIn){
-            pick.g.hexCurseHeavy=true;
-            if(pick.g.progress>0) pick.g.progress-=1;
-            addLog(g.name+' goes all-in, spending 2 '+payMat+' to curse '+pick.g.name+': their next Hunt total takes -2, and they lose 1 progress right now.', 'ev');
-          } else {
-            addLog(g.name+' spends 1 '+payMat+' to curse '+pick.g.name+': their next Hunt total takes -1.', 'ev');
-          }
-          SFX.click();
-        });
+        withState(function(){ sabotageAction(pick.i, payMat, allIn); });
         return;
       }
     }

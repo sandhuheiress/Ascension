@@ -6,14 +6,14 @@
 <title>Ascension: Hunter's Tower</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=16">
+<link rel="stylesheet" href="style.css?v=20">
 </head>
 <body>
 
 <div class="heroWrap">
   <div id="heroFlicker"></div>
   <h1 class="title">Ascension: Hunter's Tower</h1>
-  <p class="subtitle">Play locally vs AI or pass-and-play with friends, or go live online</p>
+  <p class="subtitle">&nbsp;</p>
 </div>
 
 <!--
@@ -103,7 +103,7 @@
 
 -->
 
-<div id="screenHome" style="max-width:480px;margin:0 auto;">
+<div id="screenHome" style="width:100%;box-sizing:border-box;max-width:480px;margin:0 auto;">
   <div style="text-align:center;margin-bottom:14px;">
     <button class="howBtn" id="btnHowToHome">How to play</button>
   </div>
@@ -257,7 +257,7 @@
       </div>
 
       <div class="ascendRow">
-        <button class="act ascend" id="btnAscend"><span class="lbl">&#x2B06;&#xFE0F; Ascend</span><span class="sub" id="ascendSub">pay the toll</span></button>
+        <button class="act ascend" id="btnAscend"><span class="lbl">Ascend</span><span class="sub" id="ascendSub">pay the toll</span></button>
       </div>
 
       <button class="act end" id="btnEndTurn"><span class="lbl">End turn</span></button>
@@ -347,6 +347,7 @@
       </div>
     </div>
     <p class="duelResultText" id="duelResultText"></p>
+    <button class="glow-btn" id="duelRollBtn" style="display:none;margin-top:6px;">Roll</button>
   </div>
 </div>
 
@@ -364,27 +365,27 @@
 <div class="modalOverlay" id="howToOverlay">
   <div class="modalCard glass">
     <h2>How to play</h2>
-    <div class="howRow"><span class="hic">&#x1F3AF;</span><span class="htxt"><b>Objective:</b> race to Floor 6 and defeat the Sovereign, or hold the strongest position when your friends call the game.</span></div>
-    <div class="howRow"><span class="hic">&#x2694;&#xFE0F;</span><span class="htxt"><b>Turn actions (2 AP):</b> Hunt, Train, Raid, Sabotage, and Ascend each cost 1 action point. Trade, Craft, and Transmute are free.</span></div>
-    <div class="howRow"><span class="hic">&#x1F3B2;</span><span class="htxt"><b>Hunt:</b> roll 2d6 vs the floor's DR. Success grants +1 progress and a Loot Card, usually this floor's material, sometimes Broken Gear (single use, +2 to a Hunt &mdash; equip it and a checkbox lets you decide which Hunt to spend it on, it's never forced). A natural 2 raids whichever rival shares your floor instead of costing you progress &mdash; only an empty floor (or a Shield) spares you. Double sixes crit for +2 progress, two Loot Cards, and a free action. When a roll draws more than one Loot Card, you pick which one to keep.</span></div>
-    <div class="howRow"><span class="hic">&#x1F4DA;</span><span class="htxt"><b>Train:</b> spend 2 of the current floor's material for a guaranteed +1 progress, no roll. The reliable way to climb when the dice aren't cooperating.</span></div>
-    <div class="howRow"><span class="hic">&#x1F5E1;&#xFE0F;</span><span class="htxt"><b>Raid:</b> pick a target and steal 1 random material. Both sides then roll 2d6 plus gear bonuses (basic gear +2, upgraded +3, an equipped accessory +1); higher score lands it, ties favor the defender. Broken Gear stays Hunt-only and never adds to a Raid roll. Go <b>all-in</b> to wager a material: win, and you keep it plus knock the target down 1 progress; lose, and they keep your stake.</span></div>
-    <div class="howRow"><span class="hic">&#x1F91D;</span><span class="htxt"><b>Trade:</b> a want-board, not a one-to-one proposal. Post what material you need, and any guild can pitch what they'd take for it. Accept whichever offer you like, decline one without cancelling your want, or cancel the want outright. One active want per guild at a time, free to post, pitch, decline, or accept.</span></div>
-    <div class="howRow"><span class="hic">&#x1FA84;</span><span class="htxt"><b>Sabotage:</b> spend 1 material to curse a rival, their next Hunt total takes -1. Go <b>all-in</b> to spend 2 instead: the curse doubles to -2, and they lose 1 progress immediately.</span></div>
-    <div class="howRow"><span class="hic">&#x1F3F9;</span><span class="htxt"><b>Blacksmith:</b> craft Basic Bow (2 Kasaka Fang, reroll a die) or Basic Sword (2 Golem Crystal, +2 total), upgrade them, or craft accessories: Shield (blocks a natural-2 penalty), Lucky Coin (+1 loot on success), Compass (+1 progress on success), Ironclad Ward (blocks the next Raid against you outright). 3 item slots, only 1 accessory at a time.</span></div>
-    <div class="howRow"><span class="hic">&#x2728;</span><span class="htxt"><b>Shadow Transmutation:</b> discard any 3 materials, in any mix, to receive 1 material of your choice. Free, and repeatable as long as you have the materials and a slot for the result.</span></div>
-    <div class="howRow"><span class="hic">&#x1FA9C;</span><span class="htxt"><b>Ascend:</b> 1 AP. Once you meet the progress requirement and hold the toll material, move up to the next floor. <b>Floors 3, 5 and 6 also need a Floor Key</b>: Vanguard's Sigil (1 Kasaka Fang + 1 Golem Crystal), Kaisel Ward (1 Orc Tusk + 1 Oracle Wisp), Sovereign's Bane (1 Kaisel Scale + 1 Kasaka Fang). A Key is crafted and spent in the same instant, so it never takes a slot, and the last one reaches back to Floor 1 on purpose.</span></div>
-    <div class="howRow"><span class="hic">&#x1F9FA;</span><span class="htxt"><b>Storage:</b> 4 material slots and 3 item slots. The cap is on variety, never on how many copies of one material you stack. Only 1 accessory at a time.</span></div>
-    <div class="howRow"><span class="hic">&#x1F9F9;</span><span class="htxt"><b>Scavenge:</b> 1 AP. Shows up when you have no material options &mdash; can't Train, Blacksmith, Transmute, Ascend, or Trade with what you're holding. Take 1 material from this floor's pool, or the nearest lower one. Once per turn.</span></div>
-    <div class="howRow"><span class="hic">&#x1F3C1;</span><span class="htxt"><b>Ending:</b> defeat the Sovereign on Floor 6 to win outright, or anyone can hit <b>End game</b> to call it whenever. Standings then rank by floor reached, then progress on that floor, then the value of materials and gear on hand (a material is worth its floor number).</span></div>
-    <div class="howRow"><span class="hic">&#x1F480;</span><span class="htxt"><b>Monster Outbreak:</b> the lowest floor nobody has cleared yet carries a countdown, shown above the Tower panel. It resets when that floor is finally cleared. If it hits 0, the guild furthest ahead loses 2 progress and everyone else loses 1.</span></div>
-    <div class="howRow"><span class="hic">&#x1F4A5;</span><span class="htxt"><b>Camping:</b> stay on the same floor past 3 of your own turns and the Monster attacks, -1 progress and -1 material.</span></div>
-    <div class="howRow"><span class="hic">&#x1F340;</span><span class="htxt"><b>Tower Events:</b> roughly 1 in 3 turns draws a random event, good or bad, when your turn begins.</span></div>
-    <div class="howRow"><span class="hic">&#x1F4C8;</span><span class="htxt"><b>Catch-up:</b> whoever is on the lowest floor gets +1 added to their Hunt rolls.</span></div>
+    <div class="howRow"><span class="htxt"><b>Objective:</b> race to Floor 6 and defeat the Sovereign, or hold the strongest position when your friends call the game.</span></div>
+    <div class="howRow"><span class="htxt"><b>Turn actions (2 AP):</b> Hunt, Train, Raid, Sabotage, and Ascend each cost 1 action point. Trade, Craft, and Transmute are free.</span></div>
+    <div class="howRow"><span class="htxt"><b>Hunt:</b> roll 2d6 vs the floor's DR. Success grants +1 progress and a Loot Card, usually this floor's material, sometimes Broken Gear (single use, +2 to a Hunt &mdash; equip it and a checkbox lets you decide which Hunt to spend it on, it's never forced). A natural 2 raids whichever rival shares your floor instead of costing you progress &mdash; only an empty floor (or a Shield) spares you. Double sixes crit for +2 progress, two Loot Cards, and a free action. When a roll draws more than one Loot Card, you pick which one to keep.</span></div>
+    <div class="howRow"><span class="htxt"><b>Train:</b> spend 2 of the current floor's material for a guaranteed +1 progress, no roll. The reliable way to climb when the dice aren't cooperating.</span></div>
+    <div class="howRow"><span class="htxt"><b>Raid:</b> pick a target and steal 1 random material. Both sides then roll 2d6 plus gear bonuses (basic gear +2, upgraded +3, an equipped accessory +1); higher score lands it, ties favor the defender. Broken Gear stays Hunt-only and never adds to a Raid roll. Go <b>all-in</b> to wager a material: win, and you keep it plus knock the target down 1 progress; lose, and they keep your stake.</span></div>
+    <div class="howRow"><span class="htxt"><b>Trade:</b> a want-board, not a one-to-one proposal. Post what material you need, and any guild can pitch what they'd take for it. Accept whichever offer you like, decline one without cancelling your want, or cancel the want outright. One active want per guild at a time, free to post, pitch, decline, or accept.</span></div>
+    <div class="howRow"><span class="htxt"><b>Sabotage:</b> spend 1 material to try to curse a rival &mdash; both sides roll 2d6 plus gear bonuses, and they resist it on a tie or better. Land it, and their next Hunt total takes -1. Go <b>all-in</b> to spend 2 instead: land it for a -2 curse and an immediate 1 progress loss.</span></div>
+    <div class="howRow"><span class="htxt"><b>Blacksmith:</b> craft Basic Bow (2 Kasaka Fang, reroll a die) or Basic Sword (2 Golem Crystal, +2 total), upgrade them, or craft accessories: Shield (blocks a natural-2 penalty), Lucky Coin (+1 loot on success), Compass (+1 progress on success), Ironclad Ward (blocks the next Raid against you outright). 3 item slots, only 1 accessory at a time.</span></div>
+    <div class="howRow"><span class="htxt"><b>Shadow Transmutation:</b> discard any 3 materials, in any mix, to receive 1 material of your choice. Free, and repeatable as long as you have the materials and a slot for the result.</span></div>
+    <div class="howRow"><span class="htxt"><b>Ascend:</b> 1 AP. Once you meet the progress requirement and hold the toll material, move up to the next floor. <b>Floors 3, 5 and 6 also need a Floor Key</b>: Vanguard's Sigil (1 Kasaka Fang + 1 Golem Crystal), Kaisel Ward (1 Orc Tusk + 1 Oracle Wisp), Sovereign's Bane (1 Kaisel Scale + 1 Kasaka Fang). A Key is crafted and spent in the same instant, so it never takes a slot, and the last one reaches back to Floor 1 on purpose.</span></div>
+    <div class="howRow"><span class="htxt"><b>Storage:</b> 4 material slots and 3 item slots. The cap is on variety, never on how many copies of one material you stack. Only 1 accessory at a time.</span></div>
+    <div class="howRow"><span class="htxt"><b>Scavenge:</b> 1 AP. Shows up when you have no material options &mdash; can't Train, Blacksmith, Transmute, Ascend, or Trade with what you're holding. Take 1 material from this floor's pool, or the nearest lower one. Once per turn.</span></div>
+    <div class="howRow"><span class="htxt"><b>Ending:</b> defeat the Sovereign on Floor 6 to win outright, or anyone can hit <b>End game</b> to call it whenever. Standings then rank by floor reached, then progress on that floor, then the value of materials and gear on hand (a material is worth its floor number).</span></div>
+    <div class="howRow"><span class="htxt"><b>Monster Outbreak:</b> the lowest floor nobody has cleared yet carries a countdown, shown above the Tower panel. It resets when that floor is finally cleared. If it hits 0, the guild furthest ahead loses 2 progress and everyone else loses 1.</span></div>
+    <div class="howRow"><span class="htxt"><b>Camping:</b> stay on the same floor past 3 of your own turns and the Monster attacks, -1 progress and -1 material.</span></div>
+    <div class="howRow"><span class="htxt"><b>Tower Events:</b> roughly 1 in 3 turns draws a random event, good or bad, when your turn begins.</span></div>
+    <div class="howRow"><span class="htxt"><b>Catch-up:</b> whoever is on the lowest floor gets +1 added to their Hunt rolls.</span></div>
     <div class="modalCloseRow"><button class="glow-btn" id="btnCloseHowTo">Got it</button></div>
   </div>
 </div>
 
-<script type="module" src="game.js?v=19"></script>
+<script type="module" src="game.js?v=20"></script>
 </body>
 </html>
