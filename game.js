@@ -55,9 +55,6 @@ const GEAR={
 const GEAR_ICON={ 'Basic Bow':'\u{1F3F9}', 'Upgraded Bow':'\u{1F3F9}✨', 'Basic Sword':'⚔️', 'Upgraded Sword':'\u{1F5E1}️', 'Shield':'\u{1F6E1}️', 'Lucky Coin':'\u{1F340}', 'Compass':'\u{1F9ED}', 'Ironclad Ward':'\u{1F6E1}️✨', 'Broken Gear':'\u{1FA93}' };
 const GEAR_ART={ 'Basic Bow':'icon_basic_bow', 'Upgraded Bow':'icon_bow_upgraded', 'Basic Sword':'icon_basic_sword', 'Upgraded Sword':'icon_sword_upgraded', 'Compass':'icon_compass', 'Lucky Coin':'icon_lucky_coin', 'Shield':'icon_shield' };
 function pseudoHash(str){ let h=0; str=String(str); for(let i=0;i<str.length;i++){ h=(h*31+str.charCodeAt(i))>>>0; } return h; }
-// Broken Gear has no fixed shape of its own — each piece shows a randomly
-// (but stably, per seed) picked base weapon icon with the cracked overlay
-// layered on top, so the same piece doesn't change look every render
 const BROKEN_GEAR_POOL=['Basic Bow','Basic Sword'];
 function brokenGearInner(seed){
   const base=GEAR_ART[BROKEN_GEAR_POOL[pseudoHash(seed)%BROKEN_GEAR_POOL.length]];
@@ -178,10 +175,6 @@ setInterval(updateTurnTimerDisplay, 1000);
 let tutorialOn=false, tutorialPrompted=false, tutorialChoiceMade=false, gamePaused=false;
 const seenTips=new Set();
 function isPaused(){ return LOCAL_MODE ? gamePaused : !!(state && state.paused); }
-// Keep the board frozen for a moment after a Raid/Sabotage (or anything
-// else that shares the pendingDuel/lastDuel system) resolves, so the next
-// turn doesn't start — and steal the overlay — while the result is still
-// being shown.
 function duelRevealActive(){
   return !!(state && state.lastDuel && Date.now()-(state.lastDuel.at||0)<DUEL_REVEAL_MS);
 }
@@ -295,9 +288,6 @@ function maybeBotDuelRoll(){
   setTimeout(function(){ botDuelRollScheduled=false; withState(function(){ rollDuelSide(side); }); }, BOT_SPEEDS[botSpeedIdx]);
 }
 
-// pausing an online room is a host-only privilege — everyone's actions
-// freeze either way (isFrozen() reads the synced state.paused), but only
-// the host's device can flip it, same as calling End Game
 function setPaused(p){
   if(LOCAL_MODE){
     gamePaused=p;
@@ -324,16 +314,11 @@ document.getElementById('btnResume').onclick=function(){ setPaused(false); };
 
 document.getElementById('logToggle').onclick=function(){ document.getElementById('logPanel').classList.toggle('collapsed'); };
 
-// Tips show immediately (rather than queueing one-at-a-time) so several
-// can be on screen together, each anchored near its own target — they
-// stack instead of forcing the player to dismiss one before seeing the next.
 function coachTip(id, targetEl, html){
   if(!tutorialOn || seenTips.has(id) || !targetEl || !targetEl.offsetParent) return;
   seenTips.add(id);
   showFloatingTip(html, targetEl);
 }
-// Same floating popup coachTip uses, minus the "only once" gating — for
-// info that should be re-showable on demand, like clicking a gear piece.
 function showFloatingTip(html, targetEl){
   const tip=document.createElement('div');
   tip.className='coachTip glass';
@@ -375,8 +360,6 @@ document.getElementById('btnHowToGame').onclick=openHowTo;
 document.getElementById('btnCloseHowTo').onclick=closeHowTo;
 document.getElementById('howToOverlay').onclick=function(e){ if(e.target.id==='howToOverlay') closeHowTo(); };
 
-// Static reference — always available, doesn't reflect any guild's own
-// stock (unlike the Blacksmith shop grid), just what everything costs.
 function renderRecipesPage(){
   const gearGrid=document.getElementById('recipesGearGrid');
   const items=Object.keys(GEAR).filter(function(n){ return GEAR[n].type!=='broken'; });
@@ -427,8 +410,6 @@ COLOR_OPTIONS.forEach(function(opt,i){
   };
   colorGrid.appendChild(b);
 });
-// disables colors already claimed by earlier seats in this same local
-// pass-and-play setup, so two guilds can't end up sharing an identity
 function refreshColorGridAvailability(usedColors){
   const firstFree=COLOR_OPTIONS.findIndex(function(o){ return usedColors.indexOf(o.color)<0; });
   identityColorIdx = firstFree>=0 ? firstFree : 0;
@@ -666,10 +647,6 @@ document.getElementById('joinCodeInput').addEventListener('keydown', function(e)
   if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btnFindRoom').click(); }
 });
 
-// Enter/Space triggers whichever roll is currently yours to make — the
-// duel roll (highest priority, it's blocking everything else while
-// pending), then your own seating roll, then Hunt on your turn — so you
-// never have to aim for a small button mid-game.
 document.addEventListener('keydown', function(e){
   if(e.key!=='Enter' && e.key!==' ') return;
   const tag=(document.activeElement && document.activeElement.tagName || '').toLowerCase();
@@ -717,11 +694,6 @@ function renderSlotPicker(s){
   });
 }
 
-// Firebase strips empty objects/arrays on write (an empty {} or [] is
-// indistinguishable from "no data" to it), so a guild with no materials yet,
-// no gear yet, or a fresh tradeWants/rolls map can come back from a read as
-// undefined instead of {}/[] . Every state read from the room needs this
-// restored before anything downstream assumes those fields exist.
 function normalizeState(s){
   if(!s) return s;
   (s.guilds||[]).forEach(function(g){
@@ -833,9 +805,6 @@ document.getElementById('btnEndGame').onclick=function(){
   if(confirm("Call the game now? Standings are ranked by floor reached, then progress, then materials/gear on hand — this ends it for everyone.")) withState(concludeGame);
 };
 
-// A refresh always lands back on the home screen — no auto-rejoin — so
-// stale room/slot info is cleared rather than reattaching to whatever
-// game happened to be open before the reload.
 (function goHomeOnLoad(){
   const savedRoom=localStorage.getItem('ascension_room');
   if(savedRoom) localStorage.removeItem('ascension_slot_'+savedRoom);
@@ -858,8 +827,6 @@ function myActiveIdx(){
   return lastHumanSeatLocal;
 }
 function others(){ return state.guilds.map(function(g,i){return {g:g,i:i};}).filter(function(o){ return o.i!==state.current; }); }
-// Catch-up only kicks in once you're meaningfully behind — 2+ floors
-// behind whoever's closest ahead of you, not just anyone in last place.
 function trailing(){
   const g=me();
   const ahead=state.guilds.filter(function(o){ return o.idx>g.idx; }).map(function(o){ return o.idx; });
@@ -893,8 +860,6 @@ function rollMySeat(idx){
   const tied=state.guilds.map(function(g,i){return i;}).filter(function(i){ return sr.rolls[i]===best; });
   const summary='Seating roll: '+state.guilds.map(function(g,i){return g.name+' '+sr.rolls[i];}).join(', ')+'. ';
   if(tied.length>1){
-    // A tie for the lead rerolls just the tied guilds instead of picking
-    // one of them arbitrarily — everyone else's roll stands.
     const names=tied.map(function(i){ return state.guilds[i].name; }).join(' and ');
     state.log.unshift({t:summary+'Tied for the lead at '+best+' — '+names+' roll again.', cls:''});
     tied.forEach(function(i){ delete sr.rolls[i]; });
@@ -1030,9 +995,6 @@ function render(){
     btnRaidToggle: !hasAP,
     btnSabotageToggle: !hasAP || !stockKeys(g0).length,
     btnTradeToggle: !canAct,
-    // Blacksmith is viewable any time — recipes and tolls are useful to
-    // check off-turn — the shop grid itself still gates actually crafting
-    // to your own turn, this just controls whether the panel opens at all.
     btnBlacksmithToggle: !canView,
     btnTransmute: !canAct || matTotal(g0)<TRANSMUTE_COST,
     btnAscend: !canAct || !canAscend(g0),
@@ -1404,7 +1366,7 @@ function renderDuel(){
     document.getElementById('duelTypeLabel').textContent = pending.type==='sabotage' ? 'SABOTAGE' : 'RAID';
     document.getElementById('duelAtkName').textContent=atk.name;
     document.getElementById('duelDefName').textContent=def.name;
-    const atkBonus=0, defBonus=0; // gear bonuses only apply to Hunt, not Raid/Sabotage
+    const atkBonus=0, defBonus=0;
     if(pending.atkRoll){
       const atkScore=pending.atkRoll.d1+pending.atkRoll.d2+atkBonus;
       document.getElementById('duelAtkDice').innerHTML=diceFace(pending.atkRoll.d1,'','duelA1')+diceFace(pending.atkRoll.d2,'','duelA2');
@@ -1464,9 +1426,6 @@ function renderDuel(){
   setTimeout(function(){
     if(lastDuelKey!==key) return;
     overlay.classList.remove('show');
-    // The board was frozen (isFrozen -> duelRevealActive) while this was
-    // showing; nothing else would trigger a re-render once that timer
-    // lapses on its own, so nudge the game forward here.
     if(state) render();
   }, DUEL_REVEAL_MS);
 }
@@ -1777,9 +1736,6 @@ function triggerOutbreak(){
   });
   SFX.outbreak();
   addLog('Monster Outbreak on Floor '+(state.outbreakFloor+1)+'! '+notes.join(' '), 'st');
-  // Stays active — hitting everyone again each round — until someone
-  // actually ascends (any floor), rather than quietly re-arming itself
-  // on the same clock regardless of what players do.
   state.outbreakActive = true;
 }
 
@@ -1793,13 +1749,6 @@ function concludeGame(){
   addLog('The expedition is called. '+state.guilds[ranking[0].i].name+' holds the strongest position.', 'wn');
 }
 
-// Every guild sharing the same floor means there's no "furthest behind"
-// for an Outbreak to threaten, so once the timer actually fires, a tied
-// group takes a softer hit instead of the usual material/progress loss:
-// whoever's leading on that shared floor (by progress) gets throttled to
-// 1 AP instead of 2 on their own turn, for as long as the group stays
-// tied and the Outbreak remains active. The countdown itself still runs
-// normally either way — this only changes what happens once it hits 0.
 function allSameFloor(){
   return state.guilds.every(function(g){ return g.idx===state.guilds[0].idx; });
 }
@@ -1839,9 +1788,6 @@ function endTurnAction(){
       }
     }
   }
-  // Checked after the Outbreak logic above so a leader who's just now
-  // being thrown into the active/tied state gets throttled immediately,
-  // not starting one turn late.
   const throttled=state.outbreakActive && sameFloorLeaders().indexOf(state.current)>=0;
   g.ap=throttled?1:2;
   addLog('--- '+g.name+"'s turn begins (round "+state.round+")."+(throttled?' Leading while everyone shares a floor — only 1 AP this turn.':'')+' ---');
@@ -1938,10 +1884,6 @@ function huntAction(useBrokenGear, useShield, useCoin, useCompass){
   }
 
   const gear=g.gear||[];
-  // Bow and Sword are permanent weapons, always equipped and always applied.
-  // Shield, Lucky Coin, and Compass are single-use accessories — like Broken
-  // Gear, the player picks which hunt to burn them on instead of them firing
-  // automatically the moment they're owned.
   const hasUpBow=gear.includes('Upgraded Bow'), hasBasicBow=gear.includes('Basic Bow');
   const hasUpSword=gear.includes('Upgraded Sword'), hasBasicSword=gear.includes('Basic Sword');
   const hasShield=gear.includes('Shield') && useShield!==false;
@@ -2022,9 +1964,6 @@ function trainAction(){
   if((g.mat[f.name]||0)>=2){ spendMat(g,f.name,2); g.progress+=1; capProgress(g); g.ap-=1; addLog(g.name+' trains using 2 '+f.name+', guaranteed +1 progress.'); SFX.click(); }
   else addLog(g.name+' needs 2 '+f.name+' in storage to train.');
 }
-// commits to a raid (spends the AP, locks in target and wager) but doesn't
-// roll yet — a human player rolls their own dice via the duel overlay's
-// Roll button; a bot's turn rolls immediately since nothing is waiting on it
 function raidAction(targetIdx, wagerMat){
   const g=me();
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
@@ -2047,11 +1986,6 @@ function raidAction(targetIdx, wagerMat){
   state.rollSeq=(state.rollSeq||0)+1;
   state.pendingDuel = { type:'raid', seq: state.rollSeq, atkIdx: state.current, defIdx: defIdx, wagerMat: wagering?wagerMat:null, atkRoll:null, defRoll:null, createdAt:Date.now() };
 }
-// Raid and Sabotage are both face-offs both sides actually play: the
-// attacker rolls their own dice, then the defender rolls theirs (on their
-// own device in online play), and only once both are in does the outcome
-// resolve. Bots roll their side automatically via maybeBotDuelRoll,
-// whichever side they're on.
 function rollDuelSide(side){
   const pr=state.pendingDuel;
   if(!pr) return;
@@ -2062,9 +1996,6 @@ function rollDuelSide(side){
     else finalizeRaid();
   }
 }
-// Consistent "(d1+d2)" / "(d1+d2+bonus)" breakdown text, used everywhere
-// a duel score is shown so it never looks arbitrary which rolls explain
-// themselves and which don't.
 function diceBreakdown(d1,d2,bonus){
   return bonus ? '('+d1+'+'+d2+'+'+bonus+')' : '('+d1+'+'+d2+')';
 }
@@ -2075,7 +2006,7 @@ function finalizeRaid(){
   const wagerMat=pending.wagerMat, wagering=!!wagerMat;
   const ad1=pending.atkRoll.d1, ad2=pending.atkRoll.d2;
   const dd1=pending.defRoll.d1, dd2=pending.defRoll.d2;
-  const atkBonus=0, defBonus=0; // gear bonuses only apply to Hunt, not to duels
+  const atkBonus=0, defBonus=0;
   const atkScore=ad1+ad2+atkBonus, defScore=dd1+dd2+defBonus;
   const win=atkScore>defScore;
   let resultText;
@@ -2127,7 +2058,7 @@ function finalizeSabotage(){
   const payMat=pending.payMat, allIn=pending.allIn;
   const ad1=pending.atkRoll.d1, ad2=pending.atkRoll.d2;
   const dd1=pending.defRoll.d1, dd2=pending.defRoll.d2;
-  const atkBonus=0, defBonus=0; // gear bonuses only apply to Hunt, not to duels
+  const atkBonus=0, defBonus=0;
   const atkScore=ad1+ad2+atkBonus, defScore=dd1+dd2+defBonus;
   const win=atkScore>defScore;
   const atkBreak=diceBreakdown(ad1,ad2,atkBonus), defBreak=diceBreakdown(dd1,dd2,defBonus);
@@ -2193,11 +2124,6 @@ function craftAction(itemName){
   g.gear.push(itemName);
   addLog(g.name+' crafts a '+itemName+'.');
 }
-// Whether spending would free up a slot (e.g. it empties out a material
-// you're not saving) is only knowable after simulating the spend, so the
-// storage check happens against the post-spend inventory, not the
-// current one. If it still wouldn't fit even then, dropExtra names one
-// more material (chosen by the player) to discard to make room.
 function simulateTransmuteSpend(g, spend, dropExtra){
   const simMat={};
   Object.keys(g.mat||{}).forEach(function(k){ simMat[k]=g.mat[k]; });
@@ -2274,8 +2200,6 @@ function ascendAction(){
       resetOutbreakTimer();
       addLog('Floor '+(clearedIdx+1)+' is cleared for the first time, the Outbreak Timer moves up.', 'ev');
     } else if(wasOutbreakActive){
-      // An active Outbreak isn't tied to clearing its own floor — any
-      // ascend, anywhere, is what actually stops it once it's started.
       resetOutbreakTimer();
       addLog(g.name+"'s ascent drives the Monster off — the Outbreak ends.", 'ev');
     }
@@ -2368,10 +2292,6 @@ function renderTransmutePicker(){
       renderTransmutePicker();
     };
   });
-  // Whether this fits is only knowable after simulating the spend — it
-  // can free up a slot (spending a material down to 0) that wasn't free
-  // a moment ago, so the check runs on the post-spend inventory instead
-  // of blocking the whole action up front.
   const target=document.getElementById('transmuteTarget').value;
   const dropRow=document.getElementById('transmuteDropRow');
   const dropSel=document.getElementById('transmuteDropMat');
@@ -2497,8 +2417,6 @@ function gearBlockReason(g,name){
   return null;
 }
 function renderBlacksmithShop(){
-  // Shown relative to the viewer's own guild (not whoever's turn it is)
-  // so checking recipes off-turn reflects your own stock, not theirs.
   const g=state.guilds[myActiveIdx()];
   const myTurn=isMyTurn();
   const grid=document.getElementById('blacksmithGrid');
@@ -2544,9 +2462,6 @@ function maybeSkipInactivePlayer(){
   if(!stuckSeating && !stuckDuel && !stuckTurn) return;
   withState(function(){
     if(state.winner!==null && state.winner!==undefined) return;
-    // A player stuck not rolling their own seating dice would otherwise
-    // freeze the whole room forever — force-roll for anyone who's sat on
-    // it too long, same as if they'd clicked it themselves.
     const sr2=state.seatingRoll;
     if(sr2 && !sr2.done && sr2.startedAt && Date.now()-sr2.startedAt>=INACTIVITY_MS){
       state.guilds.forEach(function(g,i){
@@ -2554,9 +2469,6 @@ function maybeSkipInactivePlayer(){
       });
       return;
     }
-    // Same idea for a Raid/Sabotage duel: whichever side hasn't rolled
-    // gets force-rolled once the wait drags on, instead of leaving the
-    // duel (and every future bot action, which waits on it) stuck forever.
     const pd2=state.pendingDuel;
     if(pd2 && pd2.createdAt && Date.now()-pd2.createdAt>=INACTIVITY_MS){
       if(!pd2.atkRoll) rollDuelSide('atk');
@@ -2628,11 +2540,6 @@ function botStep(){
     return;
   }
   if(g.ap>0 && !canDoAnything(g) && !g.scavenged){ withState(scavengeAction); return; }
-  // Transmute and Craft are both free (no AP cost), so they're checked
-  // before the AP-exhaustion end-turn fallback below, and Transmute is no
-  // longer gated on already being ascend-ready — a bot with spare
-  // materials converts toward whatever toll/key material it's short on
-  // as soon as it can, instead of only at the last moment.
   if(matTotal(g)>=TRANSMUTE_COST){
     const want=[];
     if((g.mat[f.name]||0)<f.toll) want.push(f.name);
