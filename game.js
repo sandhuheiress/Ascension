@@ -46,9 +46,9 @@ const GEAR={
   'Upgraded Bow':   { type:'weapon', line:'bow',   tier:2, cost:{'Golem Crystal':2}, requires:'Basic Bow', desc:'Reroll one die once, add the new value on top of the original total.' },
   'Basic Sword':    { type:'weapon', line:'sword', tier:1, cost:{'Golem Crystal':2}, desc:'+2 to the final roll total.' },
   'Upgraded Sword': { type:'weapon', line:'sword', tier:2, cost:{'Orc Tusk':3}, requires:'Basic Sword', desc:'+4 to the final roll total.' },
-  'Shield':         { type:'accessory', cost:{'Kasaka Fang':2,'Golem Crystal':1}, desc:'Prevents Ascension Progress loss on a failed hunt.' },
-  'Lucky Coin':     { type:'accessory', cost:{'Orc Tusk':2,'Oracle Wisp':1}, desc:'+1 extra loot on a successful hunt.' },
-  'Compass':        { type:'accessory', cost:{'Kaisel Scale':1,'Orc Tusk':2}, desc:'+1 extra Ascension Progress on a successful hunt.' },
+  'Shield':         { type:'accessory', cost:{'Kasaka Fang':2,'Golem Crystal':1}, desc:'Single use: prevents Ascension Progress loss on a natural 2, then it breaks.' },
+  'Lucky Coin':     { type:'accessory', cost:{'Orc Tusk':2,'Oracle Wisp':1}, desc:'Single use: +1 extra loot on a successful hunt, then it breaks.' },
+  'Compass':        { type:'accessory', cost:{'Kaisel Scale':1,'Orc Tusk':2}, desc:'Single use: +1 extra Ascension Progress on a successful hunt, then it breaks.' },
   'Ironclad Ward':  { type:'accessory', cost:{'Orc Tusk':2,'Kaisel Scale':1}, desc:'Blocks the next Raid against you outright, then breaks.' },
   'Broken Gear':    { type:'broken', cost:{}, desc:'Single use: +2 to one hunt, then it breaks.' }
 };
@@ -268,6 +268,7 @@ function renderSeatingRollOverlay(){
 let botSeatRollScheduled=false;
 function maybeBotSeatingRoll(){
   if(!state || !isBotDriver()) return;
+  if(!tutorialChoiceMade || isPaused()) return;
   if(botSeatRollScheduled) return;
   const sr=state.seatingRoll;
   if(!sr || sr.done) return;
@@ -280,6 +281,7 @@ function maybeBotSeatingRoll(){
 let botDuelRollScheduled=false;
 function maybeBotDuelRoll(){
   if(!state || !isBotDriver()) return;
+  if(!tutorialChoiceMade || isPaused()) return;
   if(botDuelRollScheduled) return;
   const pr=state.pendingDuel;
   if(!pr) return;
@@ -328,6 +330,11 @@ document.getElementById('logToggle').onclick=function(){ document.getElementById
 function coachTip(id, targetEl, html){
   if(!tutorialOn || seenTips.has(id) || !targetEl || !targetEl.offsetParent) return;
   seenTips.add(id);
+  showFloatingTip(html, targetEl);
+}
+// Same floating popup coachTip uses, minus the "only once" gating — for
+// info that should be re-showable on demand, like clicking a gear piece.
+function showFloatingTip(html, targetEl){
   const tip=document.createElement('div');
   tip.className='coachTip glass';
   tip.innerHTML='<div class="coachTipBody">'+html+'</div><button class="coachTipClose" type="button">Got it</button>';
@@ -341,6 +348,11 @@ function coachTip(id, targetEl, html){
   const closeFn=function(){ if(tip.parentNode) tip.remove(); };
   tip.querySelector('.coachTipClose').onclick=closeFn;
   setTimeout(closeFn, 16000);
+}
+function showGearInfo(name, targetEl){
+  const def=GEAR[name];
+  if(!def || !targetEl) return;
+  showFloatingTip('<b>'+name+'</b><br>'+def.desc, targetEl);
 }
 
 document.getElementById('modeLocalBtn').onclick=function(){
@@ -1036,6 +1048,24 @@ function render(){
   if(showBroken) coachTip('brokenGear', brokenRow,
     'That\'s Broken Gear: a one-time +2 to a Hunt, then it breaks. It used to apply itself automatically — now you decide, so you can save it for a hunt that actually matters instead of burning it on a random one.');
 
+  const shieldRow=document.getElementById('shieldRow');
+  const showShield=canAct && (g0.gear||[]).includes('Shield');
+  shieldRow.style.display = showShield ? '' : 'none';
+  if(showShield) coachTip('shieldGear', shieldRow,
+    'Shield is single use: check this box and if you roll a natural 2 this Hunt, you keep your progress instead of losing it. Only breaks if it actually triggers, so it\'s safe to leave checked.');
+
+  const luckyCoinRow=document.getElementById('luckyCoinRow');
+  const showCoin=canAct && (g0.gear||[]).includes('Lucky Coin');
+  luckyCoinRow.style.display = showCoin ? '' : 'none';
+  if(showCoin) coachTip('coinGear', luckyCoinRow,
+    'Lucky Coin is single use: check this box for +1 extra loot card on a successful Hunt, then it breaks. Save it for a hunt you\'re confident in.');
+
+  const compassRow=document.getElementById('compassRow');
+  const showCompass=canAct && (g0.gear||[]).includes('Compass');
+  compassRow.style.display = showCompass ? '' : 'none';
+  if(showCompass) coachTip('compassGear', compassRow,
+    'Compass is single use: check this box for +1 extra Ascension Progress on a successful Hunt, then it breaks. Save it for a hunt you\'re confident in.');
+
   if(!dis.btnTrain) coachTip('train', document.getElementById('btnTrain'),
     '<b>Train</b> spends 2 of this floor\'s material for a guaranteed +1 progress, no dice. When the rolls aren\'t going your way, this is the safe option.');
   if(!dis.btnScavenge) coachTip('scavenge', document.getElementById('btnScavenge'),
@@ -1093,11 +1123,13 @@ function renderOutbreakBadge(){
   const fl=floors[state.outbreakFloor];
   if(state.outbreakActive){
     el.classList.add('warn');
+    const tied=allSameFloor();
     el.innerHTML =
       '<div class="obLabel">Outbreak Timer<b>Floor '+(state.outbreakFloor+1)+', '+fl.name+'</b></div>'+
-      '<div class="obDial" style="--pct:1"><div class="obCount">!</div></div>';
-    coachTip('outbreak', el,
-      'The Monster is active and hits everyone again every round. Only someone ascending &mdash; any floor, any guild &mdash; drives it off.');
+      '<div class="obDial" style="--pct:1"><div class="obCount">'+(tied?'1AP':'!')+'</div></div>';
+    coachTip('outbreak', el, tied
+      ? 'Everyone\'s tied on the same floor, so the Monster can\'t single anyone out — instead, whoever\'s leading only gets 1 AP each turn until someone ascends and breaks up the tie.'
+      : 'The Monster is active and hits everyone again every round. Only someone ascending &mdash; any floor, any guild &mdash; drives it off.');
     return;
   }
   const t=state.outbreakTimer;
@@ -1174,7 +1206,7 @@ function renderPlacemat(){
 
   const gearChips=gear.map(function(name,i){
     const fresh=prevGear.indexOf(name)<0;
-    return '<div class="matCard gear'+(fresh?' fresh':'')+'" style="--tint:var(--violet)">'+gearIcon(name,g.name+'|'+i)+'<span class="mcName">'+name+'</span></div>';
+    return '<div class="matCard gear clickable'+(fresh?' fresh':'')+'" style="--tint:var(--violet)" data-gear="'+name+'" title="Click for details">'+gearIcon(name,g.name+'|'+i)+'<span class="mcName">'+name+'</span></div>';
   });
   prevGear=gear.slice();
   if(matChips.concat(gearChips).some(function(c){ return c.indexOf('fresh')>=0; })) SFX.gain();
@@ -1191,7 +1223,11 @@ function renderPlacemat(){
   matsEl.querySelectorAll('.matCard[data-mat]').forEach(function(el){
     el.onclick=function(){ openDiscardPanel(el.dataset.mat); };
   });
-  document.getElementById('placematGear').innerHTML = pad(gearChips, GEAR_SLOTS);
+  const gearEl=document.getElementById('placematGear');
+  gearEl.innerHTML = pad(gearChips, GEAR_SLOTS);
+  gearEl.querySelectorAll('.matCard[data-gear]').forEach(function(el){
+    el.onclick=function(){ showGearInfo(el.dataset.gear, el); };
+  });
 }
 
 const pawnAt={};
@@ -1334,7 +1370,7 @@ function renderDice(){
   box.innerHTML =
     '<p style="font-size:11.5px;color:var(--text-mid);margin:0 0 4px;">'+h.guildName+' hunts '+h.matName+'</p>'+
     '<div class="diceRow">'+diceFace(h.d1,'','dc1')+'<span class="plus">+</span>'+diceFace(h.d2,'','dc2')+'</div>'+
-    (h.snake ? '<p style="font-size:12px;color:var(--text-dim);">snake eyes</p>' : '<p style="font-size:12px;color:var(--text-dim);">total '+h.total+' vs DR '+h.dr+'</p>')+
+    (h.snake ? '<p style="font-size:12px;color:var(--text-dim);">snake eyes</p>' : '<p style="font-size:12px;color:var(--text-dim);">total '+h.total+' vs DR '+h.dr+(h.gearNote?h.gearNote:'')+'</p>')+
     '<p class="resultLine '+resultCls+'">'+resultText+'</p>'+
     (showLoot ? '<div class="lootRevealRow">'+h.loot.map(function(loot,i){ return lootCard(loot, loot.gearSeed!==undefined ? loot.gearSeed : h.seq+'|'+i); }).join('')+'</div>' : '');
   
@@ -1368,7 +1404,7 @@ function renderDuel(){
     document.getElementById('duelTypeLabel').textContent = pending.type==='sabotage' ? 'SABOTAGE' : 'RAID';
     document.getElementById('duelAtkName').textContent=atk.name;
     document.getElementById('duelDefName').textContent=def.name;
-    const atkBonus=raidGearBonus(atk), defBonus=raidGearBonus(def);
+    const atkBonus=0, defBonus=0; // gear bonuses only apply to Hunt, not Raid/Sabotage
     if(pending.atkRoll){
       const atkScore=pending.atkRoll.d1+pending.atkRoll.d2+atkBonus;
       document.getElementById('duelAtkDice').innerHTML=diceFace(pending.atkRoll.d1,'','duelA1')+diceFace(pending.atkRoll.d2,'','duelA2');
@@ -1757,6 +1793,23 @@ function concludeGame(){
   addLog('The expedition is called. '+state.guilds[ranking[0].i].name+' holds the strongest position.', 'wn');
 }
 
+// Every guild sharing the same floor means there's no "furthest behind"
+// for an Outbreak to threaten, so once the timer actually fires, a tied
+// group takes a softer hit instead of the usual material/progress loss:
+// whoever's leading on that shared floor (by progress) gets throttled to
+// 1 AP instead of 2 on their own turn, for as long as the group stays
+// tied and the Outbreak remains active. The countdown itself still runs
+// normally either way — this only changes what happens once it hits 0.
+function allSameFloor(){
+  return state.guilds.every(function(g){ return g.idx===state.guilds[0].idx; });
+}
+function sameFloorLeaders(){
+  if(!allSameFloor()) return [];
+  const n=state.guilds.length;
+  const topN=Math.max(1, Math.floor(n/2));
+  const sorted=state.guilds.map(function(g,i){ return {i:i, progress:g.progress}; }).sort(function(a,b){ return b.progress-a.progress; });
+  return sorted.slice(0,topN).map(function(x){ return x.i; });
+}
 function endTurnAction(){
   if(state.winner!==null && state.winner!==undefined) return;
   const n=state.guilds.length;
@@ -1767,20 +1820,32 @@ function endTurnAction(){
   state.turnStartedAt=Date.now();
   state.lastHunt=null;
   const g=me();
-  g.ap=2; g.hexCurse=false; g.scavenged=false;
+  g.hexCurse=false; g.scavenged=false;
   g.turnsOnFloor=(g.turnsOnFloor||0)+1;
   checkFloorCamping(g);
-  addLog('--- '+g.name+"'s turn begins (round "+state.round+"). ---");
-  maybeDrawEvent(g);
   if(wrapped){
     if(state.outbreakTimer===undefined || state.outbreakTimer===null) resetOutbreakTimer();
     if(state.outbreakActive){
-      triggerOutbreak();
+      if(!allSameFloor()) triggerOutbreak();
     } else {
       state.outbreakTimer-=1;
-      if(state.outbreakTimer<=0) triggerOutbreak();
+      if(state.outbreakTimer<=0){
+        if(allSameFloor()){
+          state.outbreakActive=true;
+          addLog('The Monster stirs on Floor '+(state.outbreakFloor+1)+', but everyone is standing there together — instead of an attack, whoever is leading only gets 1 AP each turn until the group splits up.', 'st');
+        } else {
+          triggerOutbreak();
+        }
+      }
     }
   }
+  // Checked after the Outbreak logic above so a leader who's just now
+  // being thrown into the active/tied state gets throttled immediately,
+  // not starting one turn late.
+  const throttled=state.outbreakActive && sameFloorLeaders().indexOf(state.current)>=0;
+  g.ap=throttled?1:2;
+  addLog('--- '+g.name+"'s turn begins (round "+state.round+")."+(throttled?' Leading while everyone shares a floor — only 1 AP this turn.':'')+' ---');
+  maybeDrawEvent(g);
 }
 
 function rollLootCard(){
@@ -1861,7 +1926,7 @@ function scavengeAction(){
   addLog(g.name+' has no other move and Scavenges 1 '+name+', spending its last action point.', 'ev');
   SFX.click();
 }
-function huntAction(useBrokenGear){
+function huntAction(useBrokenGear, useShield, useCoin, useCompass){
   const g=me(), f=floors[g.idx];
   if(state.winner!==null && state.winner!==undefined) return;
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
@@ -1873,10 +1938,20 @@ function huntAction(useBrokenGear){
   }
 
   const gear=g.gear||[];
+  // Bow and Sword are permanent weapons, always equipped and always applied.
+  // Shield, Lucky Coin, and Compass are single-use accessories — like Broken
+  // Gear, the player picks which hunt to burn them on instead of them firing
+  // automatically the moment they're owned.
   const hasUpBow=gear.includes('Upgraded Bow'), hasBasicBow=gear.includes('Basic Bow');
   const hasUpSword=gear.includes('Upgraded Sword'), hasBasicSword=gear.includes('Basic Sword');
-  const hasShield=gear.includes('Shield'), hasCoin=gear.includes('Lucky Coin'), hasCompass=gear.includes('Compass');
+  const hasShield=gear.includes('Shield') && useShield!==false;
+  const hasCoin=gear.includes('Lucky Coin') && useCoin!==false;
+  const hasCompass=gear.includes('Compass') && useCompass!==false;
   const hasBroken=gear.includes('Broken Gear') && useBrokenGear!==false;
+  function consumeGear(name){
+    const idx=gear.indexOf(name);
+    if(idx>=0){ gear.splice(idx,1); g.gear=gear; }
+  }
 
   let d1=1+Math.floor(Math.random()*6), d2=1+Math.floor(Math.random()*6);
   let bowBonus=0, gearNote='';
@@ -1891,9 +1966,7 @@ function huntAction(useBrokenGear){
   let brokenBonus=0;
   if(hasBroken){
     brokenBonus=2; gearNote+=' (Broken Gear +2, breaks)';
-    const brokenIdx=gear.indexOf('Broken Gear');
-    if(brokenIdx>=0) gear.splice(brokenIdx,1);
-    g.gear=gear;
+    consumeGear('Broken Gear');
   }
 
   const behind=trailing();
@@ -1905,22 +1978,24 @@ function huntAction(useBrokenGear){
 
   function successExtras(){
     let extra='';
-    if(hasCompass){ g.progress+=1; extra+=' Compass: +1 extra progress.'; }
+    if(hasCompass){ g.progress+=1; extra+=' Compass: +1 extra progress, breaks.'; consumeGear('Compass'); }
     return extra;
   }
 
   if(d1===6&&d2===6){
     g.progress+=2;
     const rolled=[rollLootCard(), rollLootCard()];
-    if(hasCoin) rolled.push(rollLootCard());
+    let coinNote='';
+    if(hasCoin){ rolled.push(rollLootCard()); coinNote=' Lucky Coin: +1 extra loot, breaks.'; consumeGear('Lucky Coin'); }
     g.ap+=1;
     hunt.crit=true; hunt.success=true;
-    addLog(g.name+' rolls double sixes! Critical hunt: +2 progress, action point refunded.'+gearNote+successExtras());
+    addLog(g.name+' rolls double sixes! Critical hunt: +2 progress, action point refunded.'+gearNote+coinNote+successExtras());
     resolveLoot(g, rolled, g.idx, hunt);
   } else if(d1===1&&d2===1){
     hunt.snake=true; hunt.shielded=hasShield;
     if(hasShield){
-      addLog(g.name+' rolls a natural 2, but the Shield absorbs it, no progress lost.', 'st');
+      addLog(g.name+' rolls a natural 2, but the Shield absorbs it and breaks, no progress lost.', 'st');
+      consumeGear('Shield');
     } else {
       g.progress=Math.max(0,g.progress-1);
       addLog(g.name+' rolls a natural 2, loses 1 banked Ascension Progress.', 'st');
@@ -1929,8 +2004,9 @@ function huntAction(useBrokenGear){
     g.progress+=1;
     hunt.success=true;
     const rolled=[rollLootCard()];
-    if(hasCoin) rolled.push(rollLootCard());
-    addLog(g.name+' rolls '+total+(behind?' (+1 catch-up)':'')+(curseAmount?' (-'+curseAmount+' cursed)':'')+gearNote+' vs DR'+f.dr+', success: +1 progress.'+successExtras());
+    let coinNote='';
+    if(hasCoin){ rolled.push(rollLootCard()); coinNote=' Lucky Coin: +1 extra loot, breaks.'; consumeGear('Lucky Coin'); }
+    addLog(g.name+' rolls '+total+(behind?' (+1 catch-up)':'')+(curseAmount?' (-'+curseAmount+' cursed)':'')+gearNote+' vs DR'+f.dr+', success: +1 progress.'+coinNote+successExtras());
     resolveLoot(g, rolled, g.idx, hunt);
   } else {
     addLog(g.name+' rolls '+total+(behind?' (+1 catch-up)':'')+(curseAmount?' (-'+curseAmount+' cursed)':'')+gearNote+' vs DR'+f.dr+', failed. Action point spent.');
@@ -1999,7 +2075,7 @@ function finalizeRaid(){
   const wagerMat=pending.wagerMat, wagering=!!wagerMat;
   const ad1=pending.atkRoll.d1, ad2=pending.atkRoll.d2;
   const dd1=pending.defRoll.d1, dd2=pending.defRoll.d2;
-  const atkBonus=raidGearBonus(g), defBonus=raidGearBonus(t);
+  const atkBonus=0, defBonus=0; // gear bonuses only apply to Hunt, not to duels
   const atkScore=ad1+ad2+atkBonus, defScore=dd1+dd2+defBonus;
   const win=atkScore>defScore;
   let resultText;
@@ -2032,16 +2108,6 @@ function finalizeRaid(){
   };
   state.pendingDuel=null;
 }
-function raidGearBonus(g){
-  let bonus=0;
-  (g.gear||[]).forEach(function(name){
-    const def=GEAR[name];
-    if(!def) return;
-    if(def.type==='weapon') bonus += (def.tier===2 ? 3 : 2);
-    else if(name==='Lucky Coin' || name==='Compass') bonus += 1;
-  });
-  return bonus;
-}
 function sabotageAction(targetIdx, payMat, allIn){
   const g=me();
   if(g.ap<=0){ addLog('No action points left, end your turn.'); return; }
@@ -2061,7 +2127,7 @@ function finalizeSabotage(){
   const payMat=pending.payMat, allIn=pending.allIn;
   const ad1=pending.atkRoll.d1, ad2=pending.atkRoll.d2;
   const dd1=pending.defRoll.d1, dd2=pending.defRoll.d2;
-  const atkBonus=raidGearBonus(g), defBonus=raidGearBonus(t);
+  const atkBonus=0, defBonus=0; // gear bonuses only apply to Hunt, not to duels
   const atkScore=ad1+ad2+atkBonus, defScore=dd1+dd2+defBonus;
   const win=atkScore>defScore;
   const atkBreak=diceBreakdown(ad1,ad2,atkBonus), defBreak=diceBreakdown(dd1,dd2,defBonus);
@@ -2240,13 +2306,16 @@ document.getElementById('btnEndTurn').onclick=function(){
 document.getElementById('btnHunt').onclick=function(){
   if(!isMyTurn()) return;
   const useBroken=document.getElementById('brokenGearToggle').checked;
-  withState(function(){ huntAction(useBroken); });
+  const useShield=document.getElementById('shieldToggle').checked;
+  const useCoin=document.getElementById('luckyCoinToggle').checked;
+  const useCompass=document.getElementById('compassToggle').checked;
+  withState(function(){ huntAction(useBroken, useShield, useCoin, useCompass); });
 };
 document.getElementById('btnTrain').onclick=function(){ if(!isMyTurn()) return; withState(trainAction); };
 document.getElementById('btnRaidToggle').onclick=function(){
   showOnlyPanel('raidPanel'); refreshTargetSelects();
   coachTip('raid', document.getElementById('raidTarget'),
-    'Pick a target and steal 1 random material. The opposed roll (yours vs theirs, gear included) decides whether it lands. Feeling bold? Go all-in below to wager a material for a bigger payoff, at the risk of losing it.');
+    'Pick a target and steal 1 random material. The opposed roll (yours vs theirs, pure dice, no gear) decides whether it lands. Feeling bold? Go all-in below to wager a material for a bigger payoff, at the risk of losing it.');
 };
 document.getElementById('btnCancelRaid').onclick=function(){ document.getElementById('raidPanel').classList.remove('show'); };
 document.getElementById('btnSendRaid').onclick=function(){
