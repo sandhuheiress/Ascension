@@ -2797,6 +2797,50 @@ body.in-game .heroWrap { display: none; }
     text-align: center;
   }
 
+  .recipesSubhead {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: var(--gold);
+    margin: 18px 0 8px;
+  }
+
+  .recipesFloorList {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .recipesFloorRow {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 6px 12px;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-glow);
+    border-radius: 6px;
+  }
+
+  .recipesFloorName {
+    font-family: 'Cinzel', serif;
+    font-weight: 600;
+    font-size: 12.5px;
+    color: var(--text-hi);
+  }
+
+  .recipesFloorDetail {
+    font-size: 11.5px;
+    color: var(--text-mid);
+  }
+
+  .shopReq {
+    font-weight: 400;
+    color: var(--text-dim);
+    font-size: 9.5px;
+  }
+
   .howRow {
     display: flex;
     gap: 12px;

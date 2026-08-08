@@ -28,7 +28,7 @@ const KEYS={
   4: {name:'Kaisel Ward',      art:2, cost:{'Orc Tusk':1,'Oracle Wisp':1}},
   5: {name:"Sovereign's Bane", art:3, cost:{'Kaisel Scale':1,'Kasaka Fang':1}}
 };
-const CAP=2, CAMP_LIMIT=4, GEAR_SLOTS=3, TRANSMUTE_COST=3, LOOT_REVEAL_MS=6500, DUEL_REVEAL_MS=6000;
+const CAP=3, CAMP_LIMIT=4, GEAR_SLOTS=3, TRANSMUTE_COST=3, LOOT_REVEAL_MS=5500, DUEL_REVEAL_MS=1500;
 function poolCapFor(n){ return 5*n; }
 const LOOT_DECK=['mat','mat','mat','mat','mat','mat','mat','mat','mat','mat','broken','broken'];
 const PALETTE=['#4fd8ff','#a480ff','#e0b756','#ff8b7a'];
@@ -363,6 +363,36 @@ document.getElementById('btnHowToGame').onclick=openHowTo;
 document.getElementById('btnCloseHowTo').onclick=closeHowTo;
 document.getElementById('howToOverlay').onclick=function(e){ if(e.target.id==='howToOverlay') closeHowTo(); };
 
+// Static reference — always available, doesn't reflect any guild's own
+// stock (unlike the Blacksmith shop grid), just what everything costs.
+function renderRecipesPage(){
+  const gearGrid=document.getElementById('recipesGearGrid');
+  const items=Object.keys(GEAR).filter(function(n){ return GEAR[n].type!=='broken'; });
+  gearGrid.innerHTML = items.map(function(name){
+    const def=GEAR[name];
+    const costChips=Object.keys(def.cost).map(function(m){ return '<span class="costPill">'+def.cost[m]+' '+m+'</span>'; }).join('');
+    return '<div class="shopItem">'+
+      '<div class="shopIcon">'+gearIcon(name)+'</div>'+
+      '<div class="shopName">'+name+(def.requires?' <span class="shopReq">(needs '+def.requires+')</span>':'')+'</div>'+
+      '<div class="shopCost">'+(costChips||'<span class="costPill">free</span>')+'</div>'+
+      '<div class="shopDesc">'+def.desc+'</div>'+
+    '</div>';
+  }).join('');
+  const floorList=document.getElementById('recipesFloorList');
+  floorList.innerHTML = floors.map(function(f,i){
+    const key=keyFor(i);
+    return '<div class="recipesFloorRow">'+
+      '<span class="recipesFloorName">Floor '+(i+1)+' &mdash; '+f.name+'</span>'+
+      '<span class="recipesFloorDetail">DR '+f.dr+', '+f.need+' progress'+(f.toll?', '+f.toll+' '+f.name+' toll':'')+(key?', + '+key.name+' ('+costText(key.cost)+')':'')+'</span>'+
+    '</div>';
+  }).join('');
+}
+function openRecipes(){ renderRecipesPage(); document.getElementById('recipesOverlay').classList.add('show'); }
+function closeRecipes(){ document.getElementById('recipesOverlay').classList.remove('show'); }
+document.getElementById('btnRecipesGame').onclick=openRecipes;
+document.getElementById('btnCloseRecipes').onclick=closeRecipes;
+document.getElementById('recipesOverlay').onclick=function(e){ if(e.target.id==='recipesOverlay') closeRecipes(); };
+
 document.getElementById('btnGoCreate').onclick=function(){ showScreen('screenCreate'); };
 document.getElementById('btnBackFromCreate').onclick=function(){ showScreen('screenHome'); };
 document.getElementById('btnGoJoin').onclick=function(){ showScreen('screenJoin'); };
@@ -473,7 +503,7 @@ document.getElementById('btnIdentityGo').onclick=async function(){
       }
     }
     state.started=true;
-    state.seatingRoll={ id:'sr'+Date.now()+Math.floor(Math.random()*10000), rolls:{} };
+    state.seatingRoll={ id:'sr'+Date.now()+Math.floor(Math.random()*10000), rolls:{}, startedAt:Date.now() };
     state.log=[{t:(friendCount? 'Local pass-and-play game started.' : 'Practice game started.'), cls:''}];
     document.getElementById('roomTag').textContent = friendCount ? 'Local pass-and-play' : 'Local practice game';
     showGame();
@@ -595,7 +625,8 @@ function freshState(n){
     tradeWants: [],
     clearedThrough: -1,
     outbreakFloor: 0,
-    outbreakTimer: floors[0].need+3
+    outbreakTimer: floors[0].need+3,
+    outbreakActive: false
   };
 }
 
@@ -695,7 +726,7 @@ function renderLobby(){
 document.getElementById('btnStartGame').onclick=async function(){
   const s=(await get(roomRef())).val();
   s.started=true;
-  s.seatingRoll={ id:'sr'+Date.now()+Math.floor(Math.random()*10000), rolls:{} };
+  s.seatingRoll={ id:'sr'+Date.now()+Math.floor(Math.random()*10000), rolls:{}, startedAt:Date.now() };
   await set(roomRef(), s);
 };
 document.getElementById('btnAddBot').onclick=async function(){
@@ -751,7 +782,7 @@ function restartLocalGame(){
     g.name=seats[i].name; g.color=seats[i].color; g.isBot=seats[i].isBot; g.claimedBy=seats[i].claimedBy;
   });
   state.started=true;
-  state.seatingRoll={ id:'sr'+Date.now()+Math.floor(Math.random()*10000), rolls:{} };
+  state.seatingRoll={ id:'sr'+Date.now()+Math.floor(Math.random()*10000), rolls:{}, startedAt:Date.now() };
   lastHumanSeatLocal=null;
   seatingRollAckedId=null;
   state.log=[{t:'New expedition, same guilds.', cls:''}];
@@ -793,7 +824,15 @@ function myActiveIdx(){
   return lastHumanSeatLocal;
 }
 function others(){ return state.guilds.map(function(g,i){return {g:g,i:i};}).filter(function(o){ return o.i!==state.current; }); }
-function trailing(){ const min=Math.min.apply(null, state.guilds.map(function(g){return g.idx;})); return me().idx===min && state.guilds.some(function(g){return g.idx>min;}); }
+// Catch-up only kicks in once you're meaningfully behind — 2+ floors
+// behind whoever's closest ahead of you, not just anyone in last place.
+function trailing(){
+  const g=me();
+  const ahead=state.guilds.filter(function(o){ return o.idx>g.idx; }).map(function(o){ return o.idx; });
+  if(!ahead.length) return false;
+  const nextAhead=Math.min.apply(null, ahead);
+  return (nextAhead-g.idx)>=2;
+}
 function addLog(t, cls){ state.log = state.log||[]; state.log.push({t:t, cls:cls||''}); if(state.log.length>50) state.log.shift(); }
 function capProgress(g){ const need=floors[g.idx].need; if(g.progress>need) g.progress=need; }
 function canAdd(g,name){ const mat=g.mat||{}; return mat.hasOwnProperty(name) || Object.keys(mat).length<CAP; }
@@ -949,6 +988,7 @@ function render(){
   }
 
   const canAct = isMyTurn() && !won && !me().isBot && !isFrozen();
+  const canView = !won && !isFrozen();
   const g0=me(), hasAP = canAct && g0.ap>0;
   const dis={
     btnHunt: !hasAP,
@@ -956,10 +996,14 @@ function render(){
     btnRaidToggle: !hasAP,
     btnSabotageToggle: !hasAP || !stockKeys(g0).length,
     btnTradeToggle: !canAct,
-    btnBlacksmithToggle: !canAct,
+    // Blacksmith is viewable any time — recipes and tolls are useful to
+    // check off-turn — the shop grid itself still gates actually crafting
+    // to your own turn, this just controls whether the panel opens at all.
+    btnBlacksmithToggle: !canView,
     btnTransmute: !canAct || matTotal(g0)<TRANSMUTE_COST,
     btnAscend: !canAct || !canAscend(g0),
-    btnScavenge: !hasAP || g0.scavenged || canDoAnything(g0)
+    btnScavenge: !hasAP || g0.scavenged || canDoAnything(g0),
+    btnDiscardToggle: !canAct || !stockKeys(g0).length
   };
   Object.keys(dis).forEach(function(id){ document.getElementById(id).disabled = dis[id]; });
   document.getElementById('btnEndTurn').disabled = !canAct;
@@ -1025,6 +1069,15 @@ function renderOutbreakBadge(){
   if(!el) return;
   if(state.outbreakFloor===undefined || state.outbreakFloor===null){ el.innerHTML=''; return; }
   const fl=floors[state.outbreakFloor];
+  if(state.outbreakActive){
+    el.classList.add('warn');
+    el.innerHTML =
+      '<div class="obLabel">Outbreak Timer<b>Floor '+(state.outbreakFloor+1)+', '+fl.name+'</b></div>'+
+      '<div class="obDial" style="--pct:1"><div class="obCount">!</div></div>';
+    coachTip('outbreak', el,
+      'The Monster is active and hits everyone again every round. Only someone ascending &mdash; any floor, any guild &mdash; drives it off.');
+    return;
+  }
   const t=state.outbreakTimer;
   const maxT=fl.need+3;
   const pct=Math.max(0, Math.min(1, t/maxT));
@@ -1033,10 +1086,10 @@ function renderOutbreakBadge(){
     '<div class="obLabel">Outbreak Timer<b>Floor '+(state.outbreakFloor+1)+', '+fl.name+'</b></div>'+
     '<div class="obDial" style="--pct:'+pct+'"><div class="obCount">'+Math.max(0,t)+'</div></div>';
   if(t<=2) coachTip('outbreak', el,
-    'When this hits 0, the Monster attacks: whoever\'s furthest ahead loses progress and a material, everyone else loses one or the other. Clearing '+fl.name+' resets it.');
+    'When this hits 0, the Monster attacks every round until someone ascends &mdash; any floor, any guild &mdash; to drive it off.');
 }
 
-const ACTIVITY_TOAST_MS=6000;
+const ACTIVITY_TOAST_MS=5000;
 const seenEventIds={}, seenHuntSeqs={};
 function queueActivity(item){
   const stack=document.getElementById('eventToastStack');
@@ -1064,7 +1117,7 @@ function checkForNewActivity(){
     seenHuntSeqs[h.seq]=true;
     if(h.snake || h.crit){
       const resultText = h.snake
-        ? (h.stolenFrom ? (h.guildName+' steals from '+h.stolenFrom+'!') : h.shielded ? (h.guildName+"'s Shield absorbs the natural 2.") : (h.guildName+' loses 1 banked progress.'))
+        ? (h.shielded ? (h.guildName+"'s Shield absorbs the natural 2.") : (h.guildName+' loses 1 banked progress.'))
         : 'Critical hunt! +2 progress, action point refunded.';
       queueActivity({ label:h.guildName+' hunts '+h.matName, title: h.snake?'Natural 2':'Critical!', text:resultText });
     }
@@ -1237,7 +1290,7 @@ function renderDice(){
     return;
   }
   const resultCls = h.snake ? 'fail' : h.crit ? 'crit' : h.success ? 'success' : 'fail';
-  const resultText = h.snake ? (h.stolenFrom ? (h.guildName+' steals from '+h.stolenFrom+'!') : h.shielded ? (h.guildName+"'s Shield absorbs the natural 2.") : (h.guildName+' loses 1 banked progress.'))
+  const resultText = h.snake ? (h.shielded ? (h.guildName+"'s Shield absorbs the natural 2.") : (h.guildName+' loses 1 banked progress.'))
     : h.crit ? 'Critical hunt! +2 progress, action point refunded.'
     : h.success ? 'Success! +1 progress.'
     : 'Failed.';
@@ -1269,9 +1322,9 @@ function renderDice(){
     }
     const myGuild=state.guilds[myActiveIdx()];
     if(h.snake && myGuild && h.guildName===myGuild.name){
-      coachTip('naturalTwo', box, h.stolenFrom
-        ? 'That\'s a natural 2: instead of a flat penalty, it raids whoever shares your floor. Standing alone has upsides.'
-        : 'That\'s a natural 2 &mdash; normally it costs banked progress, punishing whoever\'s on your floor instead. No one was here this time.');
+      coachTip('naturalTwo', box, h.shielded
+        ? 'That\'s a natural 2 &mdash; your Shield absorbed it, no progress lost.'
+        : 'That\'s a natural 2 &mdash; it costs you 1 banked Ascension Progress. Only affects you, not the table.');
     }
   }
 }
@@ -1633,6 +1686,7 @@ function nextIndex(){ return (state.current+1)%state.guilds.length; }
 function resetOutbreakTimer(){
   state.outbreakFloor = Math.min(state.clearedThrough+1, floors.length-1);
   state.outbreakTimer = floors[state.outbreakFloor].need + 3;
+  state.outbreakActive = false;
 }
 function triggerOutbreak(){
   let leadIdx=0;
@@ -1660,7 +1714,10 @@ function triggerOutbreak(){
   });
   SFX.outbreak();
   addLog('Monster Outbreak on Floor '+(state.outbreakFloor+1)+'! '+notes.join(' '), 'st');
-  resetOutbreakTimer();
+  // Stays active — hitting everyone again each round — until someone
+  // actually ascends (any floor), rather than quietly re-arming itself
+  // on the same clock regardless of what players do.
+  state.outbreakActive = true;
 }
 
 function concludeGame(){
@@ -1690,8 +1747,12 @@ function endTurnAction(){
   maybeDrawEvent(g);
   if(wrapped){
     if(state.outbreakTimer===undefined || state.outbreakTimer===null) resetOutbreakTimer();
-    state.outbreakTimer-=1;
-    if(state.outbreakTimer<=0) triggerOutbreak();
+    if(state.outbreakActive){
+      triggerOutbreak();
+    } else {
+      state.outbreakTimer-=1;
+      if(state.outbreakTimer<=0) triggerOutbreak();
+    }
   }
 }
 
@@ -1813,7 +1874,7 @@ function huntAction(useBrokenGear){
   let total=d1+d2+bowBonus+swordBonus+brokenBonus+(behind?1:0)-curseAmount;
   g.ap-=1;
   state.rollSeq=(state.rollSeq||0)+1;
-  const hunt={ seq:state.rollSeq, guildName:g.name, matName:f.name, d1:d1, d2:d2, total:total, dr:f.dr, snake:false, crit:false, success:false, stolenFrom:null, gearNote:gearNote };
+  const hunt={ seq:state.rollSeq, guildName:g.name, matName:f.name, d1:d1, d2:d2, total:total, dr:f.dr, snake:false, crit:false, success:false, gearNote:gearNote };
 
   function successExtras(){
     let extra='';
@@ -1831,17 +1892,11 @@ function huntAction(useBrokenGear){
     resolveLoot(g, rolled, g.idx, hunt);
   } else if(d1===1&&d2===1){
     hunt.snake=true; hunt.shielded=hasShield;
-    const here=others().filter(function(o){ return o.g.idx===g.idx && stockKeys(o.g).length; });
-    if(here.length){
-      const t=here[Math.floor(Math.random()*here.length)].g;
-      const s=steal(t,g);
-      hunt.stolenFrom=t.name;
-      addLog(g.name+' rolls a natural 2 and raids '+t.name+' right off this floor, stealing 1 '+s+'.', 'st');
-    } else if(hasShield){
+    if(hasShield){
       addLog(g.name+' rolls a natural 2, but the Shield absorbs it, no progress lost.', 'st');
     } else {
       g.progress=Math.max(0,g.progress-1);
-      addLog(g.name+' rolls a natural 2 with no rival on this floor to punish, loses 1 banked Ascension Progress.', 'st');
+      addLog(g.name+' rolls a natural 2, loses 1 banked Ascension Progress.', 'st');
     }
   } else if(total>=f.dr){
     g.progress+=1;
@@ -1887,7 +1942,7 @@ function raidAction(targetIdx, wagerMat){
     return;
   }
   state.rollSeq=(state.rollSeq||0)+1;
-  state.pendingDuel = { type:'raid', seq: state.rollSeq, atkIdx: state.current, defIdx: defIdx, wagerMat: wagering?wagerMat:null, atkRoll:null, defRoll:null };
+  state.pendingDuel = { type:'raid', seq: state.rollSeq, atkIdx: state.current, defIdx: defIdx, wagerMat: wagering?wagerMat:null, atkRoll:null, defRoll:null, createdAt:Date.now() };
 }
 // Raid and Sabotage are both face-offs both sides actually play: the
 // attacker rolls their own dice, then the defender rolls theirs (on their
@@ -1963,7 +2018,7 @@ function sabotageAction(targetIdx, payMat, allIn){
   spendMat(g,payMat,cost);
   g.ap-=1;
   state.rollSeq=(state.rollSeq||0)+1;
-  state.pendingDuel = { type:'sabotage', seq: state.rollSeq, atkIdx: state.current, defIdx: targetIdx, payMat: payMat, allIn: !!allIn, atkRoll:null, defRoll:null };
+  state.pendingDuel = { type:'sabotage', seq: state.rollSeq, atkIdx: state.current, defIdx: targetIdx, payMat: payMat, allIn: !!allIn, atkRoll:null, defRoll:null, createdAt:Date.now() };
 }
 function finalizeSabotage(){
   const pending=state.pendingDuel;
@@ -2037,30 +2092,66 @@ function craftAction(itemName){
   g.gear.push(itemName);
   addLog(g.name+' crafts a '+itemName+'.');
 }
-function transmuteAction(target, picks){
+// Whether spending would free up a slot (e.g. it empties out a material
+// you're not saving) is only knowable after simulating the spend, so the
+// storage check happens against the post-spend inventory, not the
+// current one. If it still wouldn't fit even then, dropExtra names one
+// more material (chosen by the player) to discard to make room.
+function simulateTransmuteSpend(g, spend, dropExtra){
+  const simMat={};
+  Object.keys(g.mat||{}).forEach(function(k){ simMat[k]=g.mat[k]; });
+  Object.keys(spend).forEach(function(k){ simMat[k]=(simMat[k]||0)-spend[k]; if(simMat[k]<=0) delete simMat[k]; });
+  if(dropExtra) delete simMat[dropExtra];
+  return simMat;
+}
+function transmuteSpendFor(g, target, picks){
+  if(picks){
+    const pickTotal=Object.keys(picks).reduce(function(sum,k){ return sum+picks[k]; },0);
+    if(pickTotal!==TRANSMUTE_COST) return null;
+    const spend={};
+    for(const k in picks){
+      if((g.mat[k]||0)<picks[k]) return null;
+      if(picks[k]>0) spend[k]=picks[k];
+    }
+    return spend;
+  }
+  let toSpend=TRANSMUTE_COST;
+  const spend={};
+  const order=stockKeys(g).sort(function(a,b){ return (a===target?1:0)-(b===target?1:0); });
+  for(const k of order){
+    if(toSpend<=0) break;
+    const take=Math.min(g.mat[k],toSpend);
+    toSpend-=take;
+    spend[k]=(spend[k]||0)+take;
+  }
+  return spend;
+}
+function transmuteAction(target, picks, dropExtra){
   const g=me();
   const total=matTotal(g);
   if(total<TRANSMUTE_COST){ addLog(g.name+' needs '+TRANSMUTE_COST+' materials to transmute, has '+total+'.'); return; }
-  if(!canAdd(g,target)){ addLog(g.name+' has no free material slot for '+target+'.'); return; }
   const targetFi=floors.findIndex(function(fl){ return fl.name===target; });
   if(targetFi>=0 && state.pools[targetFi]<=0){ addLog('The Tower has no '+target+' left to hand out, its supply is empty.'); return; }
-  if(picks){
-    const pickTotal=Object.keys(picks).reduce(function(sum,k){ return sum+picks[k]; },0);
-    if(pickTotal!==TRANSMUTE_COST){ addLog('Pick exactly '+TRANSMUTE_COST+' materials to transmute.'); return; }
-    for(const k in picks){ if((g.mat[k]||0)<picks[k]){ addLog(g.name+' does not have enough '+k+'.'); return; } }
-    for(const k in picks){ if(picks[k]>0) spendMat(g,k,picks[k]); }
-  } else {
-    let toSpend=TRANSMUTE_COST;
-    const order=stockKeys(g).sort(function(a,b){ return (a===target?1:0)-(b===target?1:0); });
-    for(const k of order){
-      if(toSpend<=0) break;
-      const take=Math.min(g.mat[k],toSpend);
-      toSpend-=take;
-      spendMat(g,k,take);
-    }
+  const spend=transmuteSpendFor(g, target, picks);
+  if(!spend){ addLog('Pick exactly '+TRANSMUTE_COST+' materials to transmute.'); return; }
+  const simMat=simulateTransmuteSpend(g, spend, dropExtra);
+  const willFit = simMat.hasOwnProperty(target) || Object.keys(simMat).length<CAP;
+  if(!willFit){ addLog(g.name+' still has no free material slot for '+target+' after spending.'); return; }
+  Object.keys(spend).forEach(function(k){ spendMat(g,k,spend[k]); });
+  if(dropExtra && (g.mat[dropExtra]||0)>0){
+    const amt=g.mat[dropExtra];
+    delete g.mat[dropExtra];
+    addLog(g.name+' also discards '+amt+' '+dropExtra+' to make room.', 'st');
   }
   addMat(g,target,1); returnMat(target,-1);
   addLog(g.name+' transmutes '+TRANSMUTE_COST+' materials into 1 '+target+'.');
+}
+function discardAction(mat, qty){
+  const g=me();
+  const have=g.mat[mat]||0;
+  if(!mat || qty<=0 || have<qty){ addLog(g.name+' does not have '+qty+' '+mat+' to discard.'); return; }
+  spendMat(g, mat, qty);
+  addLog(g.name+' discards '+qty+' '+mat+'.');
 }
 function ascendAction(){
   const g=me(), f=floors[g.idx];
@@ -2073,10 +2164,20 @@ function ascendAction(){
       addLog(g.name+' crafts and spends the '+key.name+'.', 'ev');
     }
     const clearedIdx=g.idx;
+    const wasOutbreakActive=state.outbreakActive;
     if(g.idx===floors.length-1){ state.winner=state.current; state.winReason='sovereign'; addLog(g.name+' defeats the Sovereign and wins the game.', 'wn'); }
     else { g.idx+=1; g.progress=0; g.turnsOnFloor=1; addLog(g.name+' ascends to Floor '+(g.idx+1)+'.'); }
     SFX.climb();
-    if(clearedIdx>state.clearedThrough){ state.clearedThrough=clearedIdx; resetOutbreakTimer(); addLog('Floor '+(clearedIdx+1)+' is cleared for the first time, the Outbreak Timer moves up.', 'ev'); }
+    if(clearedIdx>state.clearedThrough){
+      state.clearedThrough=clearedIdx;
+      resetOutbreakTimer();
+      addLog('Floor '+(clearedIdx+1)+' is cleared for the first time, the Outbreak Timer moves up.', 'ev');
+    } else if(wasOutbreakActive){
+      // An active Outbreak isn't tied to clearing its own floor — any
+      // ascend, anywhere, is what actually stops it once it's started.
+      resetOutbreakTimer();
+      addLog(g.name+"'s ascent drives the Monster off — the Outbreak ends.", 'ev');
+    }
   } else {
     const key=keyFor(g.idx);
     addLog(g.name+' needs 1 action point, '+f.need+' progress (has '+g.progress+')'+(f.toll?', '+f.toll+' '+f.name+' toll (has '+(g.mat[f.name]||0)+')':'')+(key?', and the '+key.name+' ('+keyCostText(g.idx)+')':'')+'.');
@@ -2087,7 +2188,7 @@ function keyCostText(idx){
   return key ? costText(key.cost) : '';
 }
 
-const PANEL_IDS=['tradePanel','sabotagePanel','transmutePanel','blacksmithPanel','raidPanel'];
+const PANEL_IDS=['tradePanel','sabotagePanel','transmutePanel','blacksmithPanel','raidPanel','discardPanel'];
 function showOnlyPanel(id){
   PANEL_IDS.forEach(function(p){
     const el=document.getElementById(p);
@@ -2148,7 +2249,6 @@ function renderTransmutePicker(){
     '</div>';
   }).join('');
   document.getElementById('transmutePickTotal').textContent=total+'/'+TRANSMUTE_COST;
-  document.getElementById('btnDoTransmute').disabled=total!==TRANSMUTE_COST;
   box.querySelectorAll('.stepBtn').forEach(function(btn){
     btn.onclick=function(){
       const mat=btn.dataset.mat, d=parseInt(btn.dataset.d,10);
@@ -2164,6 +2264,33 @@ function renderTransmutePicker(){
       renderTransmutePicker();
     };
   });
+  // Whether this fits is only knowable after simulating the spend — it
+  // can free up a slot (spending a material down to 0) that wasn't free
+  // a moment ago, so the check runs on the post-spend inventory instead
+  // of blocking the whole action up front.
+  const target=document.getElementById('transmuteTarget').value;
+  const dropRow=document.getElementById('transmuteDropRow');
+  const dropSel=document.getElementById('transmuteDropMat');
+  const doBtn=document.getElementById('btnDoTransmute');
+  if(total!==TRANSMUTE_COST){
+    doBtn.disabled=true;
+    dropRow.style.display='none';
+    return;
+  }
+  const spend=Object.assign({}, transmutePicks);
+  const simMat=simulateTransmuteSpend(g, spend, null);
+  const fitsAlready = simMat.hasOwnProperty(target) || Object.keys(simMat).length<CAP;
+  if(fitsAlready){
+    dropRow.style.display='none';
+    doBtn.disabled=false;
+  } else {
+    dropRow.style.display='';
+    const remaining=Object.keys(simMat);
+    const prev=dropSel.value;
+    dropSel.innerHTML=remaining.map(function(k){ return '<option value="'+k+'">'+k+'</option>'; }).join('');
+    if(remaining.indexOf(prev)>=0) dropSel.value=prev;
+    doBtn.disabled=!remaining.length;
+  }
 }
 document.getElementById('btnTransmute').onclick=function(){
   showOnlyPanel('transmutePanel');
@@ -2173,14 +2300,45 @@ document.getElementById('btnTransmute').onclick=function(){
   coachTip('transmute', document.getElementById('transmutePicker'),
     'Pick exactly '+TRANSMUTE_COST+' materials, in any mix, to discard for 1 of your choice. Free and repeatable — the reliable way to turn junk you\'re holding into what you actually need, without touching what you\'re saving.');
 };
+document.getElementById('transmuteTarget').onchange=function(){ renderTransmutePicker(); };
 document.getElementById('btnCancelTransmute').onclick=function(){ document.getElementById('transmutePanel').classList.remove('show'); };
 document.getElementById('btnDoTransmute').onclick=function(){
   if(!isMyTurn()) return;
   const target=document.getElementById('transmuteTarget').value;
   const picks=Object.assign({}, transmutePicks);
-  withState(function(){ transmuteAction(target, picks); });
+  const dropRow=document.getElementById('transmuteDropRow');
+  const dropExtra = dropRow.style.display!=='none' ? document.getElementById('transmuteDropMat').value : null;
+  withState(function(){ transmuteAction(target, picks, dropExtra); });
   document.getElementById('transmutePanel').classList.remove('show');
   transmutePicks={};
+};
+function renderDiscardQtyOptions(){
+  const g=me();
+  const matSel=document.getElementById('discardMat');
+  const qtySel=document.getElementById('discardQty');
+  const have=g.mat[matSel.value]||0;
+  const prevQty=qtySel.value;
+  qtySel.innerHTML='';
+  for(let i=1;i<=have;i++){ qtySel.innerHTML+='<option value="'+i+'">'+i+'</option>'; }
+  if(prevQty && parseInt(prevQty,10)<=have) qtySel.value=prevQty;
+}
+document.getElementById('btnDiscardToggle').onclick=function(){
+  showOnlyPanel('discardPanel');
+  const g=me();
+  const keys=stockKeys(g);
+  document.getElementById('discardMat').innerHTML = keys.map(function(k){ return '<option value="'+k+'">'+k+'</option>'; }).join('') || '<option value="">none</option>';
+  renderDiscardQtyOptions();
+  coachTip('discard', document.getElementById('discardMat'),
+    'Free, no roll — drop any material you don\'t want, any time it\'s your turn. Useful for clearing a slot before Transmuting for something else.');
+};
+document.getElementById('discardMat').onchange=renderDiscardQtyOptions;
+document.getElementById('btnCancelDiscard').onclick=function(){ document.getElementById('discardPanel').classList.remove('show'); };
+document.getElementById('btnDoDiscard').onclick=function(){
+  if(!isMyTurn()) return;
+  const mat=document.getElementById('discardMat').value;
+  const qty=parseInt(document.getElementById('discardQty').value,10);
+  withState(function(){ discardAction(mat, qty); });
+  document.getElementById('discardPanel').classList.remove('show');
 };
 document.getElementById('btnScavenge').onclick=function(){ if(!isMyTurn()) return; withState(scavengeAction); };
 document.getElementById('btnAscend').onclick=function(){ if(!isMyTurn()) return; withState(ascendAction); };
@@ -2230,23 +2388,27 @@ function gearBlockReason(g,name){
   return null;
 }
 function renderBlacksmithShop(){
-  const g=me();
+  // Shown relative to the viewer's own guild (not whoever's turn it is)
+  // so checking recipes off-turn reflects your own stock, not theirs.
+  const g=state.guilds[myActiveIdx()];
+  const myTurn=isMyTurn();
   const grid=document.getElementById('blacksmithGrid');
   const items=Object.keys(GEAR).filter(function(n){ return GEAR[n].type!=='broken'; });
   grid.innerHTML = items.map(function(name){
     const def=GEAR[name];
     const reason=gearBlockReason(g,name);
+    const blockText = !myTurn ? 'Not your turn' : reason;
     const costChips=Object.keys(def.cost).map(function(m){
       const short=(g.mat[m]||0)<def.cost[m];
       return '<span class="costPill'+(short?' short':'')+'">'+def.cost[m]+' '+m+'</span>';
     }).join('');
-    return '<div class="shopItem'+(reason?' locked':'')+'">'+
+    return '<div class="shopItem'+(blockText?' locked':'')+'">'+
       '<div class="shopIcon">'+gearIcon(name)+'</div>'+
       '<div class="shopName">'+name+'</div>'+
       '<div class="shopCost">'+(costChips||'<span class="costPill">free</span>')+'</div>'+
       '<div class="shopDesc">'+def.desc+'</div>'+
-      (reason
-        ? '<div class="shopLock">'+reason+'</div>'
+      (blockText
+        ? '<div class="shopLock">'+blockText+'</div>'
         : '<button class="act shopCraft" type="button" data-item="'+name+'">Craft</button>')+
     '</div>';
   }).join('');
@@ -2265,13 +2427,37 @@ const INACTIVITY_MS = 60*1000;
 function maybeSkipInactivePlayer(){
   if(LOCAL_MODE || myGuildIndex!==0) return;
   if(!state || (state.winner!==null && state.winner!==undefined)) return;
-  const g=me();
-  if(!g || g.isBot) return;
-  if(!state.turnStartedAt || Date.now()-state.turnStartedAt<INACTIVITY_MS) return;
+  const sr=state.seatingRoll;
+  const pd=state.pendingDuel;
+  const stuckSeating = sr && !sr.done && sr.startedAt && Date.now()-sr.startedAt>=INACTIVITY_MS;
+  const stuckDuel = pd && pd.createdAt && Date.now()-pd.createdAt>=INACTIVITY_MS;
+  const stuckTurn = (!sr || sr.done) && !pd && state.turnStartedAt && Date.now()-state.turnStartedAt>=INACTIVITY_MS;
+  if(!stuckSeating && !stuckDuel && !stuckTurn) return;
   withState(function(){
     if(state.winner!==null && state.winner!==undefined) return;
+    // A player stuck not rolling their own seating dice would otherwise
+    // freeze the whole room forever — force-roll for anyone who's sat on
+    // it too long, same as if they'd clicked it themselves.
+    const sr2=state.seatingRoll;
+    if(sr2 && !sr2.done && sr2.startedAt && Date.now()-sr2.startedAt>=INACTIVITY_MS){
+      state.guilds.forEach(function(g,i){
+        if(!g.isBot && (sr2.rolls||{})[i]===undefined) rollMySeat(i);
+      });
+      return;
+    }
+    // Same idea for a Raid/Sabotage duel: whichever side hasn't rolled
+    // gets force-rolled once the wait drags on, instead of leaving the
+    // duel (and every future bot action, which waits on it) stuck forever.
+    const pd2=state.pendingDuel;
+    if(pd2 && pd2.createdAt && Date.now()-pd2.createdAt>=INACTIVITY_MS){
+      if(!pd2.atkRoll) rollDuelSide('atk');
+      if(state.pendingDuel && !state.pendingDuel.defRoll) rollDuelSide('def');
+      return;
+    }
+    if(state.pendingDuel) return;
     const cur=me();
-    if(cur.isBot || !state.turnStartedAt || Date.now()-state.turnStartedAt<INACTIVITY_MS) return;
+    if(!cur || cur.isBot) return;
+    if(!state.turnStartedAt || Date.now()-state.turnStartedAt<INACTIVITY_MS) return;
     cur.inactiveSkips=(cur.inactiveSkips||0)+1;
     if(cur.inactiveSkips>=3){
       cur.isBot=true;

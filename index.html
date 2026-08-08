@@ -6,7 +6,7 @@
 <title>Ascension: Hunter's Tower</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=23">
+<link rel="stylesheet" href="style.css?v=26">
 </head>
 <body>
 
@@ -237,6 +237,7 @@
         <button class="act" id="btnBlacksmithToggle"><span class="lbl">Blacksmith</span><span class="sub">Craft or upgrade gear</span></button>
         <button class="act" id="btnTransmute"><span class="lbl">Transmute</span><span class="sub" id="transmuteSub">give &rarr; receive 1</span></button>
         <button class="act" id="btnScavenge"><span class="lbl">Scavenge</span><span class="sub">1 AP, no material options</span></button>
+        <button class="act" id="btnDiscardToggle"><span class="lbl">Discard</span><span class="sub">Free, drop a material</span></button>
       </div>
 
       <div class="ascendRow">
@@ -286,6 +287,9 @@
         <div class="row">
           <div class="field" style="flex:1 1 100%;"><label>Receive 1 of</label><select id="transmuteTarget"></select></div>
         </div>
+        <div class="row" id="transmuteDropRow" style="display:none;">
+          <div class="field" style="flex:1 1 100%;"><label id="transmuteDropLabel">Storage's still full after spending — also drop</label><select id="transmuteDropMat"></select></div>
+        </div>
         <div class="submitRow">
           <button class="act" id="btnDoTransmute" disabled>Transmute</button>
           <button class="act" id="btnCancelTransmute">Cancel</button>
@@ -296,6 +300,17 @@
         <div class="shopGrid" id="blacksmithGrid"></div>
         <div class="submitRow">
           <button class="act" id="btnCancelBlacksmith">Close</button>
+        </div>
+      </div>
+
+      <div class="panelInline glass" id="discardPanel">
+        <div class="row">
+          <div class="field" style="flex:1 1 auto;"><label>Material</label><select id="discardMat"></select></div>
+          <div class="field" style="flex:0 0 auto;"><label>Qty</label><select id="discardQty"></select></div>
+        </div>
+        <div class="submitRow">
+          <button class="act" id="btnDoDiscard">Discard</button>
+          <button class="act" id="btnCancelDiscard">Cancel</button>
         </div>
       </div>
 
@@ -311,6 +326,7 @@
       <button class="howBtn" id="btnSpeed" title="AI turn speed">1x</button>
       <button class="howBtn" id="btnPause" title="Pause">&#x23F8;&#xFE0F;</button>
       <button class="howBtn" id="btnHowToGame">How to play</button>
+      <button class="howBtn" id="btnRecipesGame">Recipes</button>
       <button class="leaveBtn" id="btnEndGame" title="Call it and see who's ahead">End game</button>
       <button class="leaveBtn" id="btnLeaveGame">Leave game</button>
     </div>
@@ -367,7 +383,7 @@
     <h2>How to play</h2>
     <div class="howRow"><span class="htxt"><b>Objective:</b> race to Floor 6 and defeat the Sovereign, or hold the strongest position when your friends call the game.</span></div>
     <div class="howRow"><span class="htxt"><b>Turn actions (2 AP):</b> Hunt, Train, Raid, Sabotage, and Ascend each cost 1 action point. Trade, Craft, and Transmute are free.</span></div>
-    <div class="howRow"><span class="htxt"><b>Hunt:</b> roll 2d6 vs the floor's DR. Success grants +1 progress and a Loot Card, usually this floor's material, sometimes Broken Gear (single use, +2 to a Hunt &mdash; equip it and a checkbox lets you decide which Hunt to spend it on, it's never forced). A natural 2 raids whichever rival shares your floor instead of costing you progress &mdash; only an empty floor (or a Shield) spares you. Double sixes crit for +2 progress, two Loot Cards, and a free action. When a roll draws more than one Loot Card, you pick which one to keep.</span></div>
+    <div class="howRow"><span class="htxt"><b>Hunt:</b> roll 2d6 vs the floor's DR. Success grants +1 progress and a Loot Card, usually this floor's material, sometimes Broken Gear (single use, +2 to a Hunt &mdash; equip it and a checkbox lets you decide which Hunt to spend it on, it's never forced). A natural 2 costs you 1 banked Ascension Progress &mdash; only a Shield spares you. Double sixes crit for +2 progress, two Loot Cards, and a free action. When a roll draws more than one Loot Card, you pick which one to keep.</span></div>
     <div class="howRow"><span class="htxt"><b>Train:</b> spend 2 of the current floor's material for a guaranteed +1 progress, no roll. The reliable way to climb when the dice aren't cooperating.</span></div>
     <div class="howRow"><span class="htxt"><b>Raid:</b> pick a target and steal 1 random material. Both sides then roll 2d6 plus gear bonuses (basic gear +2, upgraded +3, an equipped accessory +1); higher score lands it, ties favor the defender. Broken Gear stays Hunt-only and never adds to a Raid roll. Go <b>all-in</b> to wager a material: win, and you keep it plus knock the target down 1 progress; lose, and they keep your stake.</span></div>
     <div class="howRow"><span class="htxt"><b>Trade:</b> a want-board, not a one-to-one proposal. Post what material you need, and any guild can pitch what they'd take for it. Accept whichever offer you like, decline one without cancelling your want, or cancel the want outright. One active want per guild at a time, free to post, pitch, decline, or accept.</span></div>
@@ -375,18 +391,29 @@
     <div class="howRow"><span class="htxt"><b>Blacksmith:</b> craft Basic Bow (2 Kasaka Fang, reroll a die) or Basic Sword (2 Golem Crystal, +2 total), upgrade them, or craft accessories: Shield (blocks a natural-2 penalty), Lucky Coin (+1 loot on success), Compass (+1 progress on success), Ironclad Ward (blocks the next Raid against you outright). 3 item slots, only 1 accessory at a time.</span></div>
     <div class="howRow"><span class="htxt"><b>Shadow Transmutation:</b> discard any 3 materials, in any mix, to receive 1 material of your choice. Free, and repeatable as long as you have the materials and a slot for the result.</span></div>
     <div class="howRow"><span class="htxt"><b>Ascend:</b> 1 AP. Once you meet the progress requirement and hold the toll material, move up to the next floor. <b>Floors 3, 5 and 6 also need a Floor Key</b>: Vanguard's Sigil (1 Kasaka Fang + 1 Golem Crystal), Kaisel Ward (1 Orc Tusk + 1 Oracle Wisp), Sovereign's Bane (1 Kaisel Scale + 1 Kasaka Fang). A Key is crafted and spent in the same instant, so it never takes a slot, and the last one reaches back to Floor 1 on purpose.</span></div>
-    <div class="howRow"><span class="htxt"><b>Storage:</b> 4 material slots and 3 item slots. The cap is on variety, never on how many copies of one material you stack. Only 1 accessory at a time.</span></div>
+    <div class="howRow"><span class="htxt"><b>Storage:</b> 3 material slots and 3 item slots. The cap is on variety, never on how many copies of one material you stack. Only 1 accessory at a time.</span></div>
     <div class="howRow"><span class="htxt"><b>Scavenge:</b> 1 AP. Shows up when you have no material options &mdash; can't Train, Blacksmith, Transmute, Ascend, or Trade with what you're holding. Take 1 material from this floor's pool, or the nearest lower one. Once per turn.</span></div>
     <div class="howRow"><span class="htxt"><b>Ending:</b> defeat the Sovereign on Floor 6 to win outright, or anyone can hit <b>End game</b> to call it whenever. Standings then rank by floor reached, then progress on that floor, then the value of materials and gear on hand (a material is worth its floor number).</span></div>
-    <div class="howRow"><span class="htxt"><b>Three ways to play, and each one answers another:</b> <b>Rush</b> pours every action into Hunting and Ascending. <b>Turtle</b> trains, stockpiles, and only climbs when a floor is safe. <b>Trade</b> stays low and corners the material rivals need for tolls and Keys. Turtle beats Rush, because the Outbreak lands hardest on whoever climbed highest. Rush beats Trade, because reaching the Sovereign ends the game before a stockpile ever pays off. Trade beats Turtle, because a hoarder eventually needs one exact material, and the broker is the one holding it. No opening is safe on its own, so read what the table is doing and pick the counter.</span></div>
-    <div class="howRow"><span class="htxt"><b>Monster Outbreak:</b> the lowest floor nobody has cleared yet carries a countdown, shown above the Tower panel. It resets when that floor is finally cleared. If it hits 0, the guild furthest ahead loses 1 progress <b>and</b> 1 material, while everyone else loses a material, or 1 progress if they're holding nothing. The higher you've climbed, the more it costs you.</span></div>
+    <div class="howRow"><span class="htxt"><b>Monster Outbreak:</b> the lowest floor nobody has cleared yet carries a countdown, shown above the Tower panel. If it hits 0, the guild furthest ahead loses 1 progress <b>and</b> 1 material, while everyone else loses a material, or 1 progress if they're holding nothing &mdash; and it stays active, hitting the table again every round, until someone actually ascends (any floor, any guild) to drive it off. The higher you've climbed, the more it costs you.</span></div>
     <div class="howRow"><span class="htxt"><b>Camping:</b> stay on the same floor past 4 of your own turns and the Monster comes for you &mdash; roll 1d6, a 4 or higher fights it off, anything lower costs you 1 random material. The check comes round again every 4 turns you stay put.</span></div>
     <div class="howRow"><span class="htxt"><b>Tower Events:</b> roughly 1 in 3 turns draws a random event, good or bad, when your turn begins.</span></div>
-    <div class="howRow"><span class="htxt"><b>Catch-up:</b> whoever is on the lowest floor gets +1 added to their Hunt rolls.</span></div>
+    <div class="howRow"><span class="htxt"><b>Catch-up:</b> if you're 2 or more floors behind whoever's closest ahead of you, you get +1 added to your Hunt rolls.</span></div>
     <div class="modalCloseRow"><button class="glow-btn" id="btnCloseHowTo">Got it</button></div>
   </div>
 </div>
 
-<script type="module" src="game.js?v=23"></script>
+<div class="modalOverlay" id="recipesOverlay">
+  <div class="modalCard glass">
+    <h2>Recipes &amp; Tolls</h2>
+    <div class="howRow"><span class="htxt">Quick reference &mdash; what everything costs, any time, whether or not it's your turn.</span></div>
+    <h3 class="recipesSubhead">Gear</h3>
+    <div class="shopGrid" id="recipesGearGrid"></div>
+    <h3 class="recipesSubhead">Floor tolls &amp; keys</h3>
+    <div id="recipesFloorList" class="recipesFloorList"></div>
+    <div class="modalCloseRow"><button class="glow-btn" id="btnCloseRecipes">Got it</button></div>
+  </div>
+</div>
+
+<script type="module" src="game.js?v=26"></script>
 </body>
 </html>
