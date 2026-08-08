@@ -654,6 +654,28 @@ document.getElementById('joinCodeInput').addEventListener('keydown', function(e)
   if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btnFindRoom').click(); }
 });
 
+// Enter/Space triggers whichever roll is currently yours to make — the
+// duel roll (highest priority, it's blocking everything else while
+// pending), then your own seating roll, then Hunt on your turn — so you
+// never have to aim for a small button mid-game.
+document.addEventListener('keydown', function(e){
+  if(e.key!=='Enter' && e.key!==' ') return;
+  const tag=(document.activeElement && document.activeElement.tagName || '').toLowerCase();
+  if(tag==='input' || tag==='textarea' || tag==='select' || tag==='button') return;
+  const duelBtn=document.getElementById('duelRollBtn');
+  if(duelBtn && duelBtn.style.display!=='none' && !duelBtn.disabled){
+    e.preventDefault(); duelBtn.click(); return;
+  }
+  const seatBtn=document.querySelector('#seatingRollOverlay .srRollBtn');
+  if(seatBtn){
+    e.preventDefault(); seatBtn.click(); return;
+  }
+  const huntBtn=document.getElementById('btnHunt');
+  if(huntBtn && huntBtn.offsetParent && !huntBtn.disabled){
+    e.preventDefault(); huntBtn.click();
+  }
+});
+
 function renderSlotPicker(s){
   const row=document.getElementById('slotRow');
   row.innerHTML='';
@@ -1137,6 +1159,7 @@ function renderPlacemat(){
   const keys=stockKeys(g);
   const gear=g.gear||[];
 
+  const canDiscardNow=isMyTurn();
   const matChips=keys.map(function(k){
     const fi=floors.findIndex(function(fl){return fl.name===k;});
     const tint=fi>=0?FLOOR_TINT[fi]:'var(--border-glow)';
@@ -1144,7 +1167,7 @@ function renderPlacemat(){
       ? '<span class="ic art" style="--art:'+art('mat',fi+1)+'; --tint:'+tint+'"></span>'
       : '<span class="ic">&#x1F4E6;</span>';
     const fresh=(g.mat[k]||0)>(prevMats[k]||0);
-    return '<div class="matCard'+(fresh?' fresh':'')+'" style="--tint:'+tint+'"><span class="mcQty">x'+g.mat[k]+'</span>'+ic+'<span class="mcName">'+k+'</span></div>';
+    return '<div class="matCard'+(fresh?' fresh':'')+(canDiscardNow?' clickable':'')+'" style="--tint:'+tint+'" data-mat="'+k+'" title="'+(canDiscardNow?'Click to discard':'')+'"><span class="mcQty">x'+g.mat[k]+'</span>'+ic+'<span class="mcName">'+k+'</span></div>';
   });
   Object.keys(prevMats).forEach(function(k){ delete prevMats[k]; });
   keys.forEach(function(k){ prevMats[k]=g.mat[k]; });
@@ -1163,7 +1186,11 @@ function renderPlacemat(){
   }
   document.getElementById('pmMatLabel').innerHTML='Materials &middot; '+keys.length+'/'+CAP+' kinds';
   document.getElementById('pmGearLabel').innerHTML='Gear &middot; '+gear.length+'/'+GEAR_SLOTS;
-  document.getElementById('placematMats').innerHTML = pad(matChips, CAP);
+  const matsEl=document.getElementById('placematMats');
+  matsEl.innerHTML = pad(matChips, CAP);
+  matsEl.querySelectorAll('.matCard[data-mat]').forEach(function(el){
+    el.onclick=function(){ openDiscardPanel(el.dataset.mat); };
+  });
   document.getElementById('placematGear').innerHTML = pad(gearChips, GEAR_SLOTS);
 }
 
@@ -1345,7 +1372,7 @@ function renderDuel(){
     if(pending.atkRoll){
       const atkScore=pending.atkRoll.d1+pending.atkRoll.d2+atkBonus;
       document.getElementById('duelAtkDice').innerHTML=diceFace(pending.atkRoll.d1,'','duelA1')+diceFace(pending.atkRoll.d2,'','duelA2');
-      document.getElementById('duelAtkScore').textContent=atkScore+(atkBonus?' ('+(pending.atkRoll.d1+pending.atkRoll.d2)+'+'+atkBonus+')':'');
+      document.getElementById('duelAtkScore').textContent=atkScore+' '+diceBreakdown(pending.atkRoll.d1,pending.atkRoll.d2,atkBonus);
     } else {
       document.getElementById('duelAtkDice').innerHTML=diceFace(1,'idle')+diceFace(1,'idle');
       document.getElementById('duelAtkScore').textContent='';
@@ -1353,7 +1380,7 @@ function renderDuel(){
     if(pending.defRoll){
       const defScore=pending.defRoll.d1+pending.defRoll.d2+defBonus;
       document.getElementById('duelDefDice').innerHTML=diceFace(pending.defRoll.d1,'','duelD1')+diceFace(pending.defRoll.d2,'','duelD2');
-      document.getElementById('duelDefScore').textContent=defScore+(defBonus?' ('+(pending.defRoll.d1+pending.defRoll.d2)+'+'+defBonus+')':'');
+      document.getElementById('duelDefScore').textContent=defScore+' '+diceBreakdown(pending.defRoll.d1,pending.defRoll.d2,defBonus);
     } else {
       document.getElementById('duelDefDice').innerHTML=diceFace(1,'idle')+diceFace(1,'idle');
       document.getElementById('duelDefScore').textContent='';
@@ -1385,8 +1412,8 @@ function renderDuel(){
   document.getElementById('duelDefName').textContent=d.defName;
   document.getElementById('duelAtkDice').innerHTML=diceFace(d.ad1,'','duelA1')+diceFace(d.ad2,'','duelA2');
   document.getElementById('duelDefDice').innerHTML=diceFace(d.dd1,'','duelD1')+diceFace(d.dd2,'','duelD2');
-  document.getElementById('duelAtkScore').textContent=d.atkScore+(d.atkBonus?' ('+(d.ad1+d.ad2)+'+'+d.atkBonus+')':'');
-  document.getElementById('duelDefScore').textContent=d.defScore+(d.defBonus?' ('+(d.dd1+d.dd2)+'+'+d.defBonus+')':'');
+  document.getElementById('duelAtkScore').textContent=d.atkScore+' '+diceBreakdown(d.ad1,d.ad2,d.atkBonus);
+  document.getElementById('duelDefScore').textContent=d.defScore+' '+diceBreakdown(d.dd1,d.dd2,d.defBonus);
   const resultEl=document.getElementById('duelResultText');
   resultEl.textContent=d.resultText;
   resultEl.className='duelResultText '+(d.win?'win':'lose');
@@ -1524,7 +1551,7 @@ function renderGearSwap(){
     const optsHtml=ps.current.map(function(name,i){
       return '<button class="gsOption" type="button" data-name="'+name+'">'+gearIcon(name,ps.guildIdx+'|'+i)+' Drop '+name+'</button>';
     }).join('');
-    banner.innerHTML = '<div class="lcTitle">Gear full</div><div class="lcSub">Keep both current pieces and leave the new Broken Gear, or drop one to make room.</div>'+
+    banner.innerHTML = '<div class="lcTitle">Gear full</div><div class="lcSub">Keep your current gear pieces and leave the new Broken Gear, or drop one to make room.</div>'+
       '<div class="lcOptions">'+optsHtml+'</div>'+
       '<div class="btnRow"><button class="ghost-btn" id="btnKeepGear">Leave the new one</button></div>';
     banner.querySelectorAll('.gsOption').forEach(function(btn){
@@ -1959,6 +1986,12 @@ function rollDuelSide(side){
     else finalizeRaid();
   }
 }
+// Consistent "(d1+d2)" / "(d1+d2+bonus)" breakdown text, used everywhere
+// a duel score is shown so it never looks arbitrary which rolls explain
+// themselves and which don't.
+function diceBreakdown(d1,d2,bonus){
+  return bonus ? '('+d1+'+'+d2+'+'+bonus+')' : '('+d1+'+'+d2+')';
+}
 function finalizeRaid(){
   const pending=state.pendingDuel;
   if(!pending || !pending.atkRoll || !pending.defRoll) return;
@@ -1970,8 +2003,9 @@ function finalizeRaid(){
   const atkScore=ad1+ad2+atkBonus, defScore=dd1+dd2+defBonus;
   const win=atkScore>defScore;
   let resultText;
+  const atkBreak=diceBreakdown(ad1,ad2,atkBonus), defBreak=diceBreakdown(dd1,dd2,defBonus);
   if(!win){
-    let msg=g.name+' raids '+t.name+' and loses the roll, '+atkScore+' ('+ad1+'+'+ad2+'+'+atkBonus+') vs '+defScore+' ('+dd1+'+'+dd2+'+'+defBonus+'), fought off.';
+    let msg=g.name+' raids '+t.name+' and loses the roll, '+atkScore+' '+atkBreak+' vs '+defScore+' '+defBreak+', fought off.';
     resultText='Fought off!';
     if(wagering){
       spendMat(g,wagerMat,1);
@@ -1985,8 +2019,8 @@ function finalizeRaid(){
     if(wagering && t.progress>0) t.progress-=1;
     const s=steal(t,g);
     addLog((s
-      ? (g.name+' raids '+t.name+': '+atkScore+' vs '+defScore+', stealing 1 '+s+'.')
-      : (g.name+' raids '+t.name+' and wins the roll, '+atkScore+' vs '+defScore+', but they had nothing to take.'))+allInTag, 'st');
+      ? (g.name+' raids '+t.name+': '+atkScore+' '+atkBreak+' vs '+defScore+' '+defBreak+', stealing 1 '+s+'.')
+      : (g.name+' raids '+t.name+' and wins the roll, '+atkScore+' '+atkBreak+' vs '+defScore+' '+defBreak+', but they had nothing to take.'))+allInTag, 'st');
     resultText = s ? ('Steals 1 '+s+'!') : 'Wins, but there was nothing to take.';
     if(wagering) resultText+=' '+t.name+' also loses 1 progress.';
   }
@@ -2030,20 +2064,21 @@ function finalizeSabotage(){
   const atkBonus=raidGearBonus(g), defBonus=raidGearBonus(t);
   const atkScore=ad1+ad2+atkBonus, defScore=dd1+dd2+defBonus;
   const win=atkScore>defScore;
+  const atkBreak=diceBreakdown(ad1,ad2,atkBonus), defBreak=diceBreakdown(dd1,dd2,defBonus);
   let resultText;
   if(!win){
     resultText=t.name+' resists the curse!';
-    addLog(g.name+' tries to curse '+t.name+' ('+atkScore+' vs '+defScore+'), but they resist it.', 'st');
+    addLog(g.name+' tries to curse '+t.name+' ('+atkScore+' '+atkBreak+' vs '+defScore+' '+defBreak+'), but they resist it.', 'st');
   } else {
     t.hexCurse=true;
     if(allIn){
       t.hexCurseHeavy=true;
       if(t.progress>0) t.progress-=1;
       resultText=t.name+"'s next Hunt takes -3, and they lose 1 progress now.";
-      addLog(g.name+' goes all-in, spending 2 '+payMat+' to curse '+t.name+' ('+atkScore+' vs '+defScore+'): their next Hunt total takes -3, and they lose 1 progress right now.', 'ev');
+      addLog(g.name+' goes all-in, spending 2 '+payMat+' to curse '+t.name+' ('+atkScore+' '+atkBreak+' vs '+defScore+' '+defBreak+'): their next Hunt total takes -3, and they lose 1 progress right now.', 'ev');
     } else {
       resultText=t.name+"'s next Hunt takes -2.";
-      addLog(g.name+' spends 1 '+payMat+' to curse '+t.name+' ('+atkScore+' vs '+defScore+'): their next Hunt total takes -2.', 'ev');
+      addLog(g.name+' spends 1 '+payMat+' to curse '+t.name+' ('+atkScore+' '+atkBreak+' vs '+defScore+' '+defBreak+'): their next Hunt total takes -2.', 'ev');
     }
   }
   state.lastDuel={
@@ -2321,16 +2356,21 @@ function renderDiscardQtyOptions(){
   qtySel.innerHTML='';
   for(let i=1;i<=have;i++){ qtySel.innerHTML+='<option value="'+i+'">'+i+'</option>'; }
   if(prevQty && parseInt(prevQty,10)<=have) qtySel.value=prevQty;
+  document.getElementById('discardTitle').textContent = matSel.value ? 'Discard '+matSel.value+'?' : 'Discard?';
 }
-document.getElementById('btnDiscardToggle').onclick=function(){
+function openDiscardPanel(preselectMat){
+  if(!isMyTurn()) return;
   showOnlyPanel('discardPanel');
   const g=me();
   const keys=stockKeys(g);
-  document.getElementById('discardMat').innerHTML = keys.map(function(k){ return '<option value="'+k+'">'+k+'</option>'; }).join('') || '<option value="">none</option>';
+  const matSel=document.getElementById('discardMat');
+  matSel.innerHTML = keys.map(function(k){ return '<option value="'+k+'">'+k+'</option>'; }).join('') || '<option value="">none</option>';
+  if(preselectMat && keys.indexOf(preselectMat)>=0) matSel.value=preselectMat;
   renderDiscardQtyOptions();
-  coachTip('discard', document.getElementById('discardMat'),
-    'Free, no roll — drop any material you don\'t want, any time it\'s your turn. Useful for clearing a slot before Transmuting for something else.');
-};
+  coachTip('discard', matSel,
+    'Free, no roll — drop any material you don\'t want, any time it\'s your turn. Useful for clearing a slot before Transmuting for something else, or just because.');
+}
+document.getElementById('btnDiscardToggle').onclick=function(){ openDiscardPanel(); };
 document.getElementById('discardMat').onchange=renderDiscardQtyOptions;
 document.getElementById('btnCancelDiscard').onclick=function(){ document.getElementById('discardPanel').classList.remove('show'); };
 document.getElementById('btnDoDiscard').onclick=function(){
